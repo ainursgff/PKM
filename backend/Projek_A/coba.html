@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistem Peminjaman Barang Himpunan</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+        
+         :root {
+            --ink: #1a202c;
+            --muted: #4a5568;
+            --soft: #718096;
+            --line: #e2e8f0;
+            --bg: #f8f9fa;
+            --brand: #4c51bf;
+            --brand-d: #434190;
+            --good: #c6f6d5;
+            --good-ink: #22543d;
+            --warn: #feebc8;
+            --warn-ink: #7c2d12;
+            --bad: #fed7d7;
+            --bad-ink: #742a2a;
+            --space-x: clamp(1rem, 3vw, 2rem);
+        }
+        
+        html {
+            scroll-behavior: smooth
+        }
+        
+        body {
+            font-family: Inter, 'Segoe UI', system-ui, Arial, sans-serif;
+            background: var(--bg);
+            color: #2d3748;
+            line-height: 1.6
+        }
+        
+        a {
+            color: inherit
+        }
+        /* Navbar */
+        
+        nav {
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+            position: sticky;
+            top: 0;
+            z-index: 1000
+        }
+        
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.2rem 2rem
+        }
+        
+        .logo {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--ink);
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            letter-spacing: -.5px
+        }
+        
+        .logo i {
+            color: var(--brand);
+            font-size: 1.6rem
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 2.0rem;
+            list-style: none;
+            align-items: center
+        }
+        
+        .nav-links a {
+            display: inline-flex;
+            gap: .5rem;
+            align-items: center;
+            text-decoration: none;
+            color: var(--muted);
+            font-weight: 600;
+            font-size: .95rem;
+            padding: .4rem .2rem;
+            border-bottom: 2px solid transparent;
+            transition: color .2s, border-color .2s
+        }
+        
+        .nav-links a:hover {
+            color: var(--brand)
+        }
+        
+        .nav-links a.active {
+            color: var(--brand);
+            border-color: var(--brand)
+        }
+        
+        .login-btn {
+            background: var(--brand);
+            color: #fff;
+            padding: .65rem 1.2rem;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: .95rem;
+            transition: .2s
+        }
+        
+        .login-btn:hover {
+            background: var(--brand-d)
+        }
+        /* Main Container */
+        
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 3rem 2rem
+        }
+        
+        section {
+            scroll-margin-top: 88px;
+            margin-bottom: 4rem
+        }
+        
+        .section-title {
+            font-size: 1.8rem;
+            color: var(--ink);
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: .7rem;
+            margin-bottom: 1.5rem
+        }
+        /* Hero (Beranda) */
+        
+        .hero {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 0 1rem
+        }
+        
+        .hero h1 {
+            color: var(--ink);
+            font-size: 2.8rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            letter-spacing: -1px
+        }
+        
+        .hero p {
+            color: var(--soft);
+            font-size: 1.12rem;
+            max-width: 680px;
+            margin: 0 auto
+        }
+        /* Search + Filter (Katalog) */
+        
+        .search-section {
+            background: #fff;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, .06)
+        }
+        
+        .search-wrapper {
+            max-width: 700px;
+            margin: 0 auto 1.5rem;
+            position: relative
+        }
+        
+        .search-input-group {
+            display: flex;
+            gap: .75rem;
+            align-items: center
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 1rem 1.2rem;
+            border: 2px solid var(--line);
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: .2s;
+            background: #fff
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--brand);
+            box-shadow: 0 0 0 3px rgba(76, 81, 191, .1)
+        }
+        
+        .search-btn {
+            background: var(--brand);
+            color: #fff;
+            padding: 1rem 1.2rem;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            transition: .2s;
+            white-space: nowrap
+        }
+        
+        .search-btn:hover {
+            background: var(--brand-d)
+        }
+        
+        .filter-section {
+            display: flex;
+            gap: .6rem;
+            flex-wrap: wrap;
+            justify-content: center
+        }
+        
+        .filter-label {
+            font-weight: 700;
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            margin-right: .5rem
+        }
+        
+        .filter-tag {
+            background: #f7fafc;
+            color: var(--muted);
+            padding: .55rem 1.1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: .2s;
+            border: 2px solid var(--line);
+            font-weight: 600;
+            font-size: .9rem
+        }
+        
+        .filter-tag:hover {
+            background: #edf2f7;
+            border-color: #cbd5e0
+        }
+        
+        .filter-tag.active {
+            background: var(--brand);
+            color: #fff;
+            border-color: var(--brand)
+        }
+        /* Katalog grid */
+        
+        .items-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.2rem
+        }
+        
+        .items-count {
+            color: var(--soft);
+            font-size: .95rem;
+            font-weight: 600
+        }
+        
+        .items-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem
+        }
+        
+        .item-card {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 1.6rem;
+            transition: .3s;
+            display: flex;
+            flex-direction: column
+        }
+        
+        .item-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, .08);
+            border-color: var(--brand)
+        }
+        
+        .item-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1rem
+        }
+        
+        .item-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 1.6rem;
+            flex-shrink: 0
+        }
+        
+        .item-title {
+            flex: 1
+        }
+        
+        .item-name {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--ink);
+            margin-bottom: .25rem;
+            line-height: 1.3
+        }
+        
+        .item-category {
+            font-size: .8rem;
+            color: var(--soft);
+            text-transform: uppercase;
+            letter-spacing: .5px
+        }
+        
+        .item-details {
+            display: flex;
+            flex-direction: column;
+            gap: .6rem;
+            margin-bottom: 1rem
+        }
+        
+        .item-detail {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            color: var(--muted);
+            font-size: .9rem
+        }
+        
+        .item-detail i {
+            color: #a0aec0;
+            width: 16px;
+            font-size: .9rem
+        }
+        
+        .item-footer {
+            margin-top: auto;
+            padding-top: 1rem;
+            border-top: 1px solid var(--line);
+            display: flex;
+            justify-content: space-between;
+            align-items: center
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+            padding: .4rem .9rem;
+            border-radius: 6px;
+            font-size: .85rem;
+            font-weight: 800
+        }
+        
+        .status-badge.available {
+            background: var(--good);
+            color: var(--good-ink)
+        }
+        
+        .status-badge.borrowed {
+            background: var(--warn);
+            color: var(--warn-ink)
+        }
+        
+        .status-badge.maintenance {
+            background: var(--bad);
+            color: var(--bad-ink)
+        }
+        
+        .action-btn {
+            background: transparent;
+            color: var(--brand);
+            border: none;
+            cursor: pointer;
+            font-weight: 800;
+            font-size: .9rem;
+            padding: .4rem;
+            display: flex;
+            align-items: center;
+            gap: .4rem;
+            transition: color .2s
+        }
+        
+        .action-btn:hover {
+            color: var(--brand-d)
+        }
+        /* Kontak (baru, lebih premium) */
+        
+        .contact-grid {
+            display: grid;
+            grid-template-columns: 1.8fr 1.2fr;
+            gap: 1.5rem;
+            align-items: start;
+        }
+        
+        .contact-card {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 1.25rem;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, .05);
+        }
+        
+        .map-card {
+            overflow: hidden;
+            padding: 0;
+        }
+        
+        .mapbox {
+            height: 360px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #e2e8f0, #cbd5e0);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #4a5568;
+            font-weight: 800;
+            letter-spacing: .2px;
+        }
+        /* Marker imitasi */
+        
+        .mapbox::after {
+            content: "";
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #e11d48;
+            /* merah marker */
+            box-shadow: 0 0 0 6px rgba(225, 29, 72, .18);
+            transform: translateY(-6px);
+        }
+        /* Panel alamat di tepi peta */
+        
+        .map-overlay {
+            position: absolute;
+            right: 16px;
+            bottom: 16px;
+            left: auto;
+            background: rgba(255, 255, 255, .95);
+            backdrop-filter: blur(4px);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: .9rem 1rem;
+            max-width: 60%;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, .08);
+        }
+        
+        .map-overlay .addr {
+            display: flex;
+            gap: .6rem;
+            align-items: flex-start;
+            color: var(--muted);
+            font-size: .95rem
+        }
+        
+        .map-overlay .addr i {
+            color: var(--brand);
+            margin-top: .15rem
+        }
+        /* Kartu info */
+        
+        .info-head {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            margin-bottom: .75rem
+        }
+        
+        .info-head i {
+            color: var(--brand);
+            background: #eef2ff;
+            border: 1px solid #e5e7eb;
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center
+        }
+        
+        .info-title {
+            font-weight: 800;
+            color: var(--ink);
+            letter-spacing: .1px
+        }
+        
+        .info-list {
+            display: grid;
+            gap: .8rem;
+            margin: .25rem 0 1rem;
+            list-style: none
+        }
+        
+        .info-item {
+            display: flex;
+            gap: .75rem;
+            align-items: flex-start
+        }
+        
+        .info-item i {
+            color: #6366f1;
+            width: 18px;
+            margin-top: .2rem
+        }
+        
+        .info-item .k {
+            color: var(--soft);
+            font-size: .85rem;
+            display: block;
+            margin-bottom: .1rem
+        }
+        
+        .info-item .v {
+            color: var(--ink);
+            font-weight: 700
+        }
+        /* Jam layanan sebagai pills */
+        
+        .hours {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .5rem;
+            margin: .4rem 0 1rem
+        }
+        
+        .pill {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: .4rem .75rem;
+            font-size: .85rem;
+            color: var(--muted);
+            background: #fff
+        }
+        /* Aksi kontak */
+        
+        .contact-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .6rem;
+            margin-top: .25rem
+        }
+        
+        .btn-solid,
+        .btn-ghost {
+            border-radius: 10px;
+            padding: .7rem .95rem;
+            font-weight: 800;
+            display: inline-flex;
+            gap: .5rem;
+            align-items: center;
+            cursor: pointer;
+            text-decoration: none
+        }
+        
+        .btn-solid {
+            background: var(--brand);
+            color: #fff;
+            border: 1px solid var(--brand)
+        }
+        
+        .btn-solid:hover {
+            background: var(--brand-d)
+        }
+        
+        .btn-ghost {
+            background: #fff;
+            color: var(--brand);
+            border: 1px solid var(--line)
+        }
+        
+        .btn-ghost:hover {
+            border-color: var(--brand);
+            color: var(--brand-d)
+        }
+        /* Garis kecil pemisah di dalam kartu */
+        
+        .divider {
+            height: 1px;
+            background: var(--line);
+            margin: 1rem 0
+        }
+        /* Responsif */
+        
+        @media (max-width: 968px) {
+            .contact-grid {
+                grid-template-columns: 1fr
+            }
+            .mapbox {
+                height: 300px
+            }
+            .map-overlay {
+                max-width: calc(100% - 32px);
+                left: 16px
+            }
+        }
+        /* Footer */
+        
+        footer {
+            background: #1a202c;
+            color: #cbd5e0;
+            padding: 3.5rem 2rem 2rem;
+            margin-top: -30px
+        }
+        
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 3rem;
+            margin-bottom: 2.5rem
+        }
+        
+        .footer-section h3 {
+            color: #fff;
+            font-size: 1.1rem;
+            font-weight: 800;
+            margin-bottom: 1.2rem
+        }
+        
+        .footer-brand {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 1rem
+        }
+        
+        .footer-brand i {
+            color: var(--brand);
+            font-size: 1.5rem
+        }
+        
+        .footer-description {
+            color: #a0aec0;
+            line-height: 1.7;
+            margin-bottom: 1.5rem;
+            font-size: .95rem
+        }
+        
+        .footer-section a,
+        .footer-section p {
+            color: #a0aec0;
+            text-decoration: none;
+            display: block;
+            margin-bottom: .7rem;
+            font-size: .95rem;
+            transition: color .2s
+        }
+        
+        .footer-section a:hover {
+            color: #fff
+        }
+        
+        .social-links {
+            display: flex;
+            gap: .8rem;
+            margin-top: 1.5rem
+        }
+        
+        .social-icon {
+            width: 38px;
+            height: 38px;
+            background: #2d3748;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #cbd5e0;
+            transition: .2s;
+            font-size: 1rem
+        }
+        
+        .social-icon:hover {
+            background: var(--brand);
+            color: #fff
+        }
+        
+        .footer-divider {
+            border: none;
+            border-top: 1px solid #2d3748;
+            margin: 2rem 0
+        }
+        
+        .footer-bottom {
+            max-width: 1200px;
+            margin: 0 auto;
+            text-align: center;
+            color: #718096;
+            font-size: .9rem
+        }
+        /* Responsive */
+        
+        @media (max-width:968px) {
+            .footer-container {
+                grid-template-columns: repeat(2, 1fr)
+            }
+            .contact-grid {
+                grid-template-columns: 1fr
+            }
+        }
+        
+        @media (max-width:768px) {
+            .nav-links {
+                display: none
+            }
+            .hero h1 {
+                font-size: 2rem
+            }
+            .hero p {
+                font-size: 1rem
+            }
+            .search-section {
+                padding: 1.5rem
+            }
+            .search-input-group {
+                flex-direction: column
+            }
+            .search-btn {
+                width: 100%;
+                justify-content: center
+            }
+            .items-grid {
+                grid-template-columns: 1fr
+            }
+            .footer-container {
+                grid-template-columns: 1fr;
+                gap: 2rem
+            }
+            .main-container {
+                padding: 2rem 1rem
+            }
+            .form-row {
+                grid-template-columns: 1fr
+            }
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #718096
+        }
+        
+        .empty-state i {
+            font-size: 4rem;
+            color: #cbd5e0;
+            margin-bottom: 1rem
+        }
+        
+        .empty-state h3 {
+            color: #4a5568;
+            font-size: 1.3rem;
+            margin-bottom: .5rem
+        }
+        
+        .main-container {
+            padding: clamp(1.25rem, 3vw, 3rem) var(--space-x);
+        }
+        
+        .hero h1 {
+            font-size: clamp(1.6rem, 3.2vw + .5rem, 2.8rem);
+        }
+        
+        .hero p {
+            font-size: clamp(.95rem, 1.2vw + .6rem, 1.12rem);
+        }
+        /* Kartu fitur di beranda: ubah inline style jadi kelas agar responsif */
+        
+        .t-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+        
+        @media (max-width: 920px) {
+            .t-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 560px) {
+            .t-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        /* Items grid lebih luwes di layar kecil */
+        
+        .items-grid {
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        }
+        /* Map lebih fleksibel */
+        
+        .mapbox {
+            height: clamp(220px, 40vh, 360px);
+        }
+        
+        .map-overlay {
+            max-width: min(60%, 520px);
+        }
+        
+        @media (max-width: 600px) {
+            .map-overlay {
+                left: 12px;
+                right: 12px;
+                max-width: none;
+            }
+        }
+        /* Footer grid auto-fit agar rapih di banyak ukuran */
+        
+        .footer-container {
+            grid-template-columns: repeat(4, minmax(180px, 1fr));
+        }
+        
+        @media (max-width: 1100px) {
+            .footer-container {
+                grid-template-columns: repeat(2, minmax(200px, 1fr));
+            }
+        }
+        
+        @media (max-width: 640px) {
+            .footer-container {
+                grid-template-columns: 1fr;
+            }
+        }
+        /* ===== Mobile Navbar (hamburger) ===== */
+        
+        .nav-toggle {
+            display: none;
+            background: transparent;
+            border: 0;
+            cursor: pointer;
+            padding: .4rem;
+        }
+        
+        .nav-toggle i {
+            font-size: 1.4rem;
+            color: var(--ink);
+        }
+        
+        @media (max-width: 768px) {
+            .nav-toggle {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .nav-links {
+                position: absolute;
+                top: 64px;
+                right: var(--space-x);
+                background: #fff;
+                border: 1px solid var(--line);
+                border-radius: 12px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, .08);
+                padding: .6rem;
+                display: none;
+                flex-direction: column;
+                gap: .25rem;
+                width: min(260px, 86vw);
+            }
+            .nav-links a {
+                padding: .6rem .8rem;
+                border-radius: 8px;
+            }
+            .nav-links a.active,
+            .nav-links a:hover {
+                background: #f3f4f6;
+                border-bottom-color: transparent;
+                color: var(--brand);
+            }
+            .nav-links.open {
+                display: flex;
+            }
+            /* sembunyikan nav-links default hidden di CSS kamu */
+        }
+    </style>
+</head>
+
+<body>
+    <!-- NAV -->
+    <nav>
+        <div class="nav-container">
+            <div class="logo"><i class="fas fa-cube"></i><span>SistemPinjam</span></div>
+
+            <button class="nav-toggle" id="navToggle" aria-label="Buka menu">
+                <i class="fas fa-bars"></i>
+            </button>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="#beranda" data-target="beranda"><i class="fas fa-home"></i> Beranda</a></li>
+                <li><a href="#katalog" data-target="katalog"><i class="fas fa-box-open"></i> Katalog</a></li>
+                <li><a href="#kontak" data-target="kontak"><i class="fas fa-phone"></i> Kontak</a></li>
+            </ul>
+            <button class="login-btn" onclick="location.href='/login'"><i class="fas fa-sign-in-alt"></i> Masuk</button>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <!-- BERANDA -->
+        <section id="beranda">
+            <div class="hero">
+                <h1>Sistem Peminjaman Barang Himpunan</h1>
+                <p>Platform terpadu untuk mengelola peminjaman aset organisasi kampus dengan mudah, transparan, dan efisien.</p>
+            </div>
+            <div class="card t-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">
+                <div class="t-card">
+                    <div class="t-dot"></div>
+                    <div class="t-body">
+                        <div class="t-title"><i class="fa-solid fa-circle-check"></i> Proses Sederhana</div>
+                        <div class="t-meta">Ajukan, tunggu verifikasi, ambil barang—semua tercatat rapi.</div>
+                    </div>
+                </div>
+                <div class="t-card">
+                    <div class="t-dot"></div>
+                    <div class="t-body">
+                        <div class="t-title"><i class="fa-solid fa-shield-halved"></i> Transparan</div>
+                        <div class="t-meta">Status real-time: menunggu, disetujui, dipinjam, dikembalikan.</div>
+                    </div>
+                </div>
+                <div class="t-card">
+                    <div class="t-dot"></div>
+                    <div class="t-body">
+                        <div class="t-title"><i class="fa-solid fa-bell"></i> Pengingat Otomatis</div>
+                        <div class="t-meta">Reminder H-1 dan overdue agar barang cepat kembali.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- KATALOG -->
+        <section id="katalog">
+            <h2 class="section-title"><i class="fas fa-box-open"></i> Katalog Barang</h2>
+            <div class="search-section">
+                <div class="search-wrapper">
+                    <div class="search-input-group">
+                        <input type="text" class="search-input" id="searchInput" placeholder="Cari nama barang atau lokasi...">
+                        <button class="search-btn" id="btnCari"><i class="fas fa-search"></i><span>Cari</span></button>
+                    </div>
+                </div>
+                <div class="filter-section">
+                    <span class="filter-label">Filter:</span>
+                    <span class="filter-tag active" data-filter="all">Semua Barang</span>
+                    <span class="filter-tag" data-filter="elektronik">Elektronik</span>
+                    <span class="filter-tag" data-filter="olahraga">Olahraga</span>
+                    <span class="filter-tag" data-filter="acara">Acara</span>
+                    <span class="filter-tag" data-filter="dokumentasi">Dokumentasi</span>
+                </div>
+            </div>
+
+            <div class="items-header">
+                <span class="items-count" id="itemsCount">0 barang</span>
+            </div>
+            <div class="items-grid" id="itemsGrid"></div>
+        </section>
+
+        <!-- KONTAK -->
+        <section id="kontak">
+            <h2 class="section-title"><i class="fas fa-phone"></i> Kontak & Lokasi</h2>
+
+            <div class="contact-grid">
+                <!-- KIRI: Peta + overlay alamat singkat -->
+                <div class="contact-card map-card">
+                    <div class="mapbox" aria-label="Peta Kampus / Gedung Himpunan">
+                        Peta Kampus / Gedung Himpunan
+                        <div class="map-overlay">
+                            <div class="addr">
+                                <i class="fas fa-location-dot"></i>
+                                <div>
+                                    <strong>Gedung Himpunan Lt.2</strong><br/> Kampus XYZ
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KANAN: Detail kontak -->
+                <div class="contact-card">
+                    <div class="info-head">
+                        <i class="fas fa-headset"></i>
+                        <div class="info-title">Pusat Informasi & Bantuan</div>
+                    </div>
+
+                    <ul class="info-list">
+                        <li class="info-item">
+                            <i class="fas fa-envelope"></i>
+                            <div>
+                                <span class="k">Email</span>
+                                <span class="v" id="emailVal">himpunan@kampus.ac.id</span>
+                            </div>
+                            <button class="btn-ghost" style="margin-left:auto" data-copy="#emailVal">
+            <i class="fas fa-copy"></i> Salin
+          </button>
+                        </li>
+
+                        <li class="info-item">
+                            <i class="fas fa-phone"></i>
+                            <div>
+                                <span class="k">Telepon</span>
+                                <span class="v" id="telVal">+62 812-3456-7890</span>
+                            </div>
+                            <button class="btn-ghost" style="margin-left:auto" data-copy="#telVal">
+            <i class="fas fa-copy"></i> Salin
+          </button>
+                        </li>
+
+                        <li class="info-item">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <div>
+                                <span class="k">Alamat</span>
+                                <span class="v">Gedung Himpunan Lt.2, Kampus XYZ</span>
+                            </div>
+                        </li>
+                    </ul>
+
+                    <div class="divider"></div>
+
+                    <div class="info-head" style="margin-top:.25rem">
+                        <i class="fas fa-clock"></i>
+                        <div class="info-title">Jam Layanan</div>
+                    </div>
+                    <div class="hours">
+                        <span class="pill"><strong>Sen–Jum</strong> 08.00–16.00</span>
+                        <span class="pill">Sab–Min Tutup</span>
+                        <a class="btn-solid" href="mailto:himpunan@kampus.ac.id">
+                            <i class="fas fa-paper-plane"></i> Kirim Email</a>
+                        <a class="btn-ghost" target="_blank" href="https://wa.me/6281234567890?text=Halo%20Himpunan%2C%20saya%20ingin%20bertanya%20soal%20peminjaman.">
+                            <i class="fab fa-whatsapp"></i> WhatsApp
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="footer-container">
+            <div class="footer-section">
+                <div class="footer-brand"><i class="fas fa-cube"></i><span>SistemPinjam</span></div>
+                <p class="footer-description">Platform peminjaman barang himpunan kampus yang memudahkan mahasiswa dalam mengelola dan meminjam aset organisasi secara digital.</p>
+                <div class="social-links">
+                    <a href="#" class="social-icon"><i class="fab fa-instagram"></i></a>
+                    <a href="#" class="social-icon"><i class="fab fa-twitter"></i></a>
+                    <a href="#" class="social-icon"><i class="fab fa-facebook"></i></a>
+                    <a href="#" class="social-icon"><i class="fab fa-linkedin"></i></a>
+                </div>
+            </div>
+            <div class="footer-section">
+                <h3>Menu</h3>
+                <a href="#beranda">Beranda</a>
+                <a href="#katalog">Katalog Barang</a>
+                <a href="#kontak">Kontak</a>
+            </div>
+            <div class="footer-section">
+                <h3>Informasi</h3>
+                <a href="#">Syarat & Ketentuan</a>
+                <a href="#">Kebijakan Privasi</a>
+                <a href="#">Panduan Peminjaman</a>
+                <a href="#">Denda & Sanksi</a>
+                <a href="#kontak">Hubungi Kami</a>
+            </div>
+            <div class="footer-section">
+                <h3>Alamat</h3>
+                <p>Gedung Himpunan Lt.2<br>Kampus XYZ</p>
+                <p>himpunan@kampus.ac.id</p>
+                <p>+62 812-3456-7890</p>
+                <p style="margin-top:1rem;font-weight:800">Senin–Jumat: 08.00–16.00</p>
+            </div>
+        </div>
+        <hr class="footer-divider">
+        <div class="footer-bottom">
+            <p>&copy; 2025 Sistem Peminjaman Barang Himpunan. Hak Cipta Dilindungi.</p>
+        </div>
+    </footer>
+
+    <script>
+        // ====== Data dummy katalog (tetap milikmu) ======
+        const items = [{
+            id: 1,
+            name: 'Proyektor Epson EB-X41',
+            category: 'elektronik',
+            kondisi: 'Baik',
+            lokasi: 'Ruang Audio Visual',
+            status: 'available',
+            icon: 'fa-video'
+        }, {
+            id: 2,
+            name: 'Sound System TOA 200W',
+            category: 'elektronik',
+            kondisi: 'Sangat Baik',
+            lokasi: 'Ruang Serbaguna',
+            status: 'borrowed',
+            icon: 'fa-volume-up'
+        }, {
+            id: 3,
+            name: 'Tenda Camping 4 Orang',
+            category: 'olahraga',
+            kondisi: 'Baik',
+            lokasi: 'Gudang Outdoor',
+            status: 'available',
+            icon: 'fa-campground'
+        }];
+
+        // ====== Katalog: render + filter + search ======
+        let currentFilter = 'all';
+        const grid = document.getElementById('itemsGrid');
+        const countEl = document.getElementById('itemsCount');
+        const input = document.getElementById('searchInput');
+
+        const renderItems = list => {
+            countEl.textContent = `${list.length} barang`;
+            if (!list.length) {
+                grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+          <i class="fas fa-inbox"></i><h3>Tidak ada barang ditemukan</h3>
+          <p>Coba ubah kata kunci pencarian atau filter kategori</p></div>`;
+                return;
+            }
+            grid.innerHTML = '';
+            list.forEach(item => {
+                const statusMap = {
+                    available: {
+                        text: 'Tersedia',
+                        icon: 'fa-check-circle'
+                    },
+                    borrowed: {
+                        text: 'Dipinjam',
+                        icon: 'fa-clock'
+                    },
+                    maintenance: {
+                        text: 'Perawatan',
+                        icon: 'fa-tools'
+                    }
+                };
+                const s = statusMap[item.status];
+                const card = document.createElement('div');
+                card.className = 'item-card';
+                card.innerHTML = `
+          <div class="item-header">
+            <div class="item-icon"><i class="fas ${item.icon}"></i></div>
+            <div class="item-title">
+              <div class="item-name">${item.name}</div>
+              <div class="item-category">${item.category}</div>
+            </div>
+          </div>
+          <div class="item-details">
+            <div class="item-detail"><i class="fas fa-check-circle"></i><span>Kondisi: ${item.kondisi}</span></div>
+            <div class="item-detail"><i class="fas fa-map-marker-alt"></i><span>${item.lokasi}</span></div>
+          </div>
+          <div class="item-footer">
+            <span class="status-badge ${item.status}"><i class="fas ${s.icon}"></i>${s.text}</span>
+            <button class="action-btn">Detail <i class="fas fa-arrow-right"></i></button>
+          </div>`;
+                grid.appendChild(card);
+            });
+        };
+
+        const doSearch = () => {
+            const q = (input.value || '').toLowerCase();
+            let list = [...items];
+            if (currentFilter !== 'all') list = list.filter(it => it.category === currentFilter);
+            if (q) {
+                list = list.filter(it =>
+                    it.name.toLowerCase().includes(q) ||
+                    it.lokasi.toLowerCase().includes(q) ||
+                    it.kondisi.toLowerCase().includes(q) ||
+                    it.category.toLowerCase().includes(q)
+                );
+            }
+            renderItems(list);
+        };
+
+        document.querySelectorAll('.filter-tag').forEach(tag => {
+            tag.addEventListener('click', () => {
+                document.querySelectorAll('.filter-tag').forEach(t => t.classList.remove('active'));
+                tag.classList.add('active');
+                currentFilter = tag.dataset.filter;
+                doSearch();
+            });
+        });
+        document.getElementById('btnCari').addEventListener('click', doSearch);
+        input.addEventListener('input', doSearch);
+        input.addEventListener('keypress', e => {
+            if (e.key === 'Enter') doSearch();
+        });
+        renderItems(items);
+
+        // ====== Navbar: smooth scroll + active link on scroll ======
+        const links = Array.from(document.querySelectorAll('#navLinks a'));
+        const sections = links.map(a => document.getElementById(a.dataset.target));
+
+        const setActive = idx => {
+            links.forEach(l => l.classList.remove('active'));
+            if (links[idx]) links[idx].classList.add('active');
+        };
+
+        // Klik: scroll ke section (tetap halaman ini)
+        links.forEach((a, idx) => {
+            a.addEventListener('click', e => {
+                e.preventDefault();
+                document.getElementById(a.dataset.target).scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+                setActive(idx);
+            });
+        });
+
+        // Scroll spy: highlight menu sesuai section yang terlihat
+        const spy = new IntersectionObserver(entries => {
+            entries.forEach(en => {
+                if (en.isIntersecting) {
+                    const id = en.target.id;
+                    const idx = links.findIndex(a => a.dataset.target === id);
+                    setActive(idx);
+                }
+            });
+        }, {
+            root: null,
+            rootMargin: '-50% 0px -40% 0px',
+            threshold: 0
+        });
+        sections.forEach(sec => spy.observe(sec));
+    </script>
+    <script>
+        // Toggle hamburger menu
+        (function() {
+            const btn = document.getElementById('navToggle');
+            const list = document.getElementById('navLinks');
+            if (!btn || !list) return;
+            btn.addEventListener('click', () => list.classList.toggle('open'));
+
+            // auto-tutup saat link diklik (mobile)
+            list.querySelectorAll('a').forEach(a => {
+                a.addEventListener('click', () => list.classList.remove('open'));
+            });
+
+            // tutup jika klik di luar
+            document.addEventListener('click', (e) => {
+                if (!list.contains(e.target) && !btn.contains(e.target)) {
+                    list.classList.remove('open');
+                }
+            });
+        })();
+    </script>
+
+</body>
+
+</html>
