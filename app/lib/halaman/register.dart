@@ -9,7 +9,7 @@ class RegisterPage extends StatefulWidget {
   State<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _RegisterPageState extends State<RegisterPage>{
+class _RegisterPageState extends State<RegisterPage> {
 
   final TextEditingController nama = TextEditingController();
   final TextEditingController email = TextEditingController();
@@ -18,48 +18,42 @@ class _RegisterPageState extends State<RegisterPage>{
   bool loading = false;
 
   /// VALIDASI FORMAT EMAIL
-  bool validEmail(String emailText){
-
+  bool validEmail(String emailText) {
     final regex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
-
     return regex.hasMatch(emailText);
-
   }
 
   Future<void> register() async {
 
-    /// VALIDASI FIELD KOSONG
-    if(nama.text.isEmpty ||
+    /// VALIDASI FIELD
+    if (nama.text.isEmpty ||
         email.text.isEmpty ||
-        password.text.isEmpty){
+        password.text.isEmpty) {
 
       FlashMessage.warning(
         context,
-        "Semua field wajib diisi"
+        "Semua field wajib diisi",
       );
-
       return;
     }
 
-    /// VALIDASI FORMAT EMAIL
-    if(!validEmail(email.text.trim())){
+    /// VALIDASI EMAIL
+    if (!validEmail(email.text.trim())) {
 
       FlashMessage.warning(
         context,
-        "Format email tidak valid"
+        "Format email tidak valid",
       );
-
       return;
     }
 
     /// VALIDASI PASSWORD
-    if(password.text.length < 6){
+    if (password.text.length < 6) {
 
       FlashMessage.warning(
         context,
-        "Password minimal 6 karakter"
+        "Password minimal 6 karakter",
       );
-
       return;
     }
 
@@ -67,7 +61,7 @@ class _RegisterPageState extends State<RegisterPage>{
       loading = true;
     });
 
-    try{
+    try {
 
       final res = await ApiService.register(
         nama.text.trim(),
@@ -75,29 +69,41 @@ class _RegisterPageState extends State<RegisterPage>{
         password.text.trim(),
       );
 
+      /// 🔥 FIX WAJIB
+      if (!mounted) return;
+
       setState(() {
         loading = false;
       });
 
-      if(res != null){
+      if (res != null) {
 
         FlashMessage.success(
           context,
-          "Register berhasil, silakan login"
+          "Register berhasil, silakan login",
         );
 
-        Navigator.pop(context);
+        /// sedikit delay biar UX lebih halus
+        Future.delayed(const Duration(milliseconds: 800), () {
 
-      }else{
+          if (!mounted) return;
+
+          Navigator.pop(context);
+
+        });
+
+      } else {
 
         FlashMessage.error(
           context,
-          "Register gagal"
+          "Register gagal",
         );
 
       }
 
-    }catch(e){
+    } catch (e) {
+
+      if (!mounted) return;
 
       setState(() {
         loading = false;
@@ -105,15 +111,22 @@ class _RegisterPageState extends State<RegisterPage>{
 
       FlashMessage.error(
         context,
-        "Terjadi kesalahan server"
+        "Terjadi kesalahan server",
       );
 
     }
-
   }
 
   @override
-  Widget build(BuildContext context){
+  void dispose() {
+    nama.dispose();
+    email.dispose();
+    password.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
 
     return Scaffold(
 
@@ -125,9 +138,7 @@ class _RegisterPageState extends State<RegisterPage>{
       ),
 
       body: Center(
-
         child: SingleChildScrollView(
-
           child: Container(
 
             padding: const EdgeInsets.all(30),
@@ -140,9 +151,9 @@ class _RegisterPageState extends State<RegisterPage>{
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 20
+                  blurRadius: 20,
                 )
-              ]
+              ],
             ),
 
             child: Column(
@@ -154,77 +165,69 @@ class _RegisterPageState extends State<RegisterPage>{
                   "Buat Akun SmartCooks",
                   style: TextStyle(
                     fontSize: 22,
-                    fontWeight: FontWeight.bold
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
 
                 const SizedBox(height: 25),
 
-                /// INPUT NAMA
+                /// NAMA
                 TextField(
                   controller: nama,
-
                   decoration: InputDecoration(
                     labelText: "Nama",
                     prefixIcon: const Icon(Icons.person),
-
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
 
                 const SizedBox(height: 15),
 
-                /// INPUT EMAIL
+                /// EMAIL
                 TextField(
                   controller: email,
                   keyboardType: TextInputType.emailAddress,
-
                   decoration: InputDecoration(
                     labelText: "Email",
                     prefixIcon: const Icon(Icons.email),
-
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
 
                 const SizedBox(height: 15),
 
-                /// INPUT PASSWORD
+                /// PASSWORD
                 TextField(
                   controller: password,
                   obscureText: true,
-
                   decoration: InputDecoration(
                     labelText: "Password",
                     prefixIcon: const Icon(Icons.lock),
-
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
 
                 const SizedBox(height: 20),
 
-                /// BUTTON REGISTER
+                /// BUTTON
                 SizedBox(
                   width: double.infinity,
-
                   child: ElevatedButton(
 
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange,
                       padding: const EdgeInsets.symmetric(vertical: 14),
-
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)
-                      )
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                
+
                     onPressed: loading ? null : register,
 
                     child: loading
@@ -242,34 +245,32 @@ class _RegisterPageState extends State<RegisterPage>{
                           ),
                   ),
                 ),
-const SizedBox(height: 15),
 
-/// LINK KE LOGIN
-Row(
-  mainAxisAlignment: MainAxisAlignment.center,
-  children: [
+                const SizedBox(height: 15),
 
-    const Text("Sudah punya akun?"),
+                /// LOGIN LINK
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
 
-    TextButton(
+                    const Text("Sudah punya akun?"),
 
-      onPressed: () {
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        "Login",
+                        style: TextStyle(
+                          color: Colors.orange,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
 
-        Navigator.pop(context);
+                  ],
+                ),
 
-      },
-
-      child: const Text(
-        "Login",
-        style: TextStyle(
-          color: Colors.orange,
-          fontWeight: FontWeight.bold
-        ),
-      ),
-    ),
-
-  ],
-)
               ],
             ),
           ),

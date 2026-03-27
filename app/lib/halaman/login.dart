@@ -21,13 +21,11 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> login() async {
 
     /// VALIDASI FORM
-    if(email.text.isEmpty || password.text.isEmpty){
-
+    if (email.text.isEmpty || password.text.isEmpty) {
       FlashMessage.warning(
         context,
-        "Email dan password wajib diisi"
+        "Email dan password wajib diisi",
       );
-
       return;
     }
 
@@ -35,38 +33,48 @@ class _LoginPageState extends State<LoginPage> {
       loading = true;
     });
 
-    try{
+    try {
 
       final res = await ApiService.login(
         email.text.trim(),
         password.text.trim(),
       );
 
+      /// 🔥 FIX WAJIB (hindari context error)
+      if (!mounted) return;
+
       setState(() {
         loading = false;
       });
 
-      if(res != null){
+      if (res != null) {
 
         FlashMessage.success(
           context,
-          "Login berhasil"
+          "Login berhasil",
         );
 
+        /// Delay agar user lihat notifikasi
         Future.delayed(const Duration(seconds: 1), () {
+
+          if (!mounted) return;
+
           Navigator.pop(context, res["user"]);
+
         });
 
-      }else{
+      } else {
 
         FlashMessage.error(
           context,
-          "Email atau password salah"
+          "Email atau password salah",
         );
 
       }
 
-    }catch(e){
+    } catch (e) {
+
+      if (!mounted) return;
 
       setState(() {
         loading = false;
@@ -74,43 +82,47 @@ class _LoginPageState extends State<LoginPage> {
 
       FlashMessage.error(
         context,
-        "Terjadi kesalahan server"
+        "Terjadi kesalahan server",
       );
 
     }
+  }
 
+  @override
+  void dispose() {
+    email.dispose();
+    password.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
 
-return Scaffold(
+    return Scaffold(
 
-  backgroundColor: const Color(0xFFFFF6ED),
+      backgroundColor: const Color(0xFFFFF6ED),
 
-  appBar: AppBar(
-    title: const Text("Login"),
-    backgroundColor: Colors.orange,
+      appBar: AppBar(
+        title: const Text("Login"),
+        backgroundColor: Colors.orange,
 
-    leading: IconButton(
-      icon: const Icon(Icons.arrow_back),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
 
-      onPressed: () {
+          onPressed: () {
 
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const MyApp()),
-          (route) => false,
-        );
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const MyApp()),
+              (route) => false,
+            );
 
-      },
-    ),
-  ),
+          },
+        ),
+      ),
 
-  body: Center(
-
+      body: Center(
         child: SingleChildScrollView(
-
           child: Container(
 
             padding: const EdgeInsets.all(30),
@@ -122,10 +134,10 @@ return Scaffold(
 
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 20
+                  color: Colors.black.withValues(alpha: 0.1), // ✅ FIX
+                  blurRadius: 20,
                 )
-              ]
+              ],
             ),
 
             child: Column(
@@ -148,7 +160,7 @@ return Scaffold(
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: Colors.orange
+                    color: Colors.orange,
                   ),
                 ),
 
@@ -164,7 +176,7 @@ return Scaffold(
                     prefixIcon: const Icon(Icons.email),
 
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
@@ -181,7 +193,7 @@ return Scaffold(
                     prefixIcon: const Icon(Icons.lock),
 
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
@@ -193,14 +205,13 @@ return Scaffold(
                   width: double.infinity,
 
                   child: ElevatedButton(
-
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange,
                       padding: const EdgeInsets.symmetric(vertical: 14),
 
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)
-                      )
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
 
                     onPressed: loading ? null : login,
@@ -231,7 +242,6 @@ return Scaffold(
                     const Text("Belum punya akun?"),
 
                     TextButton(
-
                       onPressed: () {
 
                         Navigator.push(
@@ -247,7 +257,7 @@ return Scaffold(
                         "Register",
                         style: TextStyle(
                           color: Colors.orange,
-                          fontWeight: FontWeight.bold
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),

@@ -87,6 +87,8 @@ class NavbarSmartCooks extends StatelessWidget {
                       ),
                     );
 
+                    if(!context.mounted) return;
+
                     if(result != null){
                       onLogin(result);
                     }
@@ -94,7 +96,7 @@ class NavbarSmartCooks extends StatelessWidget {
                   }
 
                   /// REGISTER
-                  if(value == "register"){
+                  else if(value == "register"){
 
                     Navigator.push(
                       context,
@@ -106,12 +108,12 @@ class NavbarSmartCooks extends StatelessWidget {
                   }
 
                   /// LOGOUT
-                  if(value == "logout"){
+                  else if(value == "logout"){
                     onLogout();
                   }
 
                   /// FAQ
-                  if(value == "faq"){
+                  else if(value == "faq"){
 
                     showDialog(
                       context: context,
@@ -126,7 +128,7 @@ class NavbarSmartCooks extends StatelessWidget {
                   }
 
                   /// TENTANG
-                  if(value == "about"){
+                  else if(value == "about"){
 
                     showDialog(
                       context: context,

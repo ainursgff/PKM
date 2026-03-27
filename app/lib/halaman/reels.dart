@@ -3,8 +3,9 @@ import 'package:video_player/video_player.dart';
 import '../halaman/login.dart';
 import '../partials/bottom.dart';
 import '../partials/flash.dart';
+import '../config.dart';
 
-const String videoBase = "http://192.168.1.9:3000/makanan/video/";
+String get videoBase => ServerConfig.videoBase;
 
 class ReelsPage extends StatefulWidget {
   final List<Map<String, dynamic>> videos;
@@ -23,7 +24,6 @@ class ReelsPage extends StatefulWidget {
 }
 
 class _ReelsPageState extends State<ReelsPage> {
-
   late PageController controller;
   int currentIndex = 0;
   int selectedIndex = 1;
@@ -34,14 +34,11 @@ class _ReelsPageState extends State<ReelsPage> {
 
     currentIndex = widget.startIndex;
 
-    controller = PageController(
-      initialPage: widget.startIndex,
-    );
+    controller = PageController(initialPage: widget.startIndex);
   }
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       backgroundColor: Colors.black,
       extendBody: true,
@@ -58,7 +55,6 @@ class _ReelsPageState extends State<ReelsPage> {
         },
 
         itemBuilder: (context, index) {
-
           final data = widget.videos[index];
 
           return ReelItem(
@@ -72,7 +68,6 @@ class _ReelsPageState extends State<ReelsPage> {
       bottomNavigationBar: BottomNavSmartCooks(
         selectedIndex: selectedIndex,
         onTap: (i) {
-
           setState(() {
             selectedIndex = i;
           });
@@ -87,7 +82,6 @@ class _ReelsPageState extends State<ReelsPage> {
 }
 
 class ReelItem extends StatefulWidget {
-
   final Map<String, dynamic> data;
   final bool isActive;
   final Map<String, dynamic>? user;
@@ -104,7 +98,6 @@ class ReelItem extends StatefulWidget {
 }
 
 class _ReelItemState extends State<ReelItem> {
-
   VideoPlayerController? controller;
 
   bool isLiked = false;
@@ -119,45 +112,40 @@ class _ReelItemState extends State<ReelItem> {
   void initState() {
     super.initState();
 
-    controller = VideoPlayerController.networkUrl(
-      Uri.parse("$videoBase${widget.data['url_video']}"),
-    )
-      ..initialize().then((_) {
+    controller =
+        VideoPlayerController.networkUrl(
+            Uri.parse("$videoBase${widget.data['url_video']}"),
+          )
+          ..initialize().then((_) {
+            controller!.setLooping(true);
 
-        controller!.setLooping(true);
+            if (widget.isActive) {
+              controller!.play();
+            }
 
-        if (widget.isActive) {
-          controller!.play();
-        }
-
-        setState(() {});
-      });
+            setState(() {});
+          });
   }
 
   /// REDIRECT LOGIN + PAUSE VIDEO
   void redirectLogin() {
-
-    if(redirecting) return;
+    if (redirecting) return;
     redirecting = true;
 
     controller?.pause();
 
     FlashMessage.warning(
       context,
-      "Silakan login untuk menyukai video\nMengarahkan ke halaman login..."
+      "Silakan login untuk menyukai video\nMengarahkan ke halaman login...",
     );
 
     Future.delayed(const Duration(seconds: 2), () {
-
-      if(!mounted) return;
+      if (!mounted) return;
 
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => const LoginPage(),
-        ),
+        MaterialPageRoute(builder: (_) => const LoginPage()),
       );
-
     });
   }
 
@@ -181,33 +169,27 @@ class _ReelItemState extends State<ReelItem> {
   }
 
   void togglePlay() {
-
     if (controller == null) return;
 
     if (controller!.value.isPlaying) {
-
       controller!.pause();
 
       setState(() {
         showPauseIcon = true;
       });
-
     } else {
-
       controller!.play();
 
       setState(() {
         showPauseIcon = false;
       });
-
     }
 
     setState(() {});
   }
 
   void likeAnimation() {
-
-    if(!isLogin){
+    if (!isLogin) {
       redirectLogin();
       return;
     }
@@ -218,19 +200,16 @@ class _ReelItemState extends State<ReelItem> {
     });
 
     Future.delayed(const Duration(milliseconds: 800), () {
-
       if (mounted) {
         setState(() {
           showHeart = false;
         });
       }
-
     });
   }
 
   void toggleLike() {
-
-    if(!isLogin){
+    if (!isLogin) {
       redirectLogin();
       return;
     }
@@ -242,10 +221,8 @@ class _ReelItemState extends State<ReelItem> {
 
   @override
   Widget build(BuildContext context) {
-
     return Stack(
       children: [
-
         Container(color: Colors.black),
 
         if (controller != null && controller!.value.isInitialized)
@@ -265,28 +242,16 @@ class _ReelItemState extends State<ReelItem> {
             ),
           )
         else
-          const Center(
-            child: CircularProgressIndicator(
-              color: Colors.white,
-            ),
-          ),
+          const Center(child: CircularProgressIndicator(color: Colors.white)),
 
         if (showHeart)
           const Center(
-            child: Icon(
-              Icons.favorite,
-              color: Colors.white,
-              size: 120,
-            ),
+            child: Icon(Icons.favorite, color: Colors.white, size: 120),
           ),
 
         if (showPauseIcon)
           const Center(
-            child: Icon(
-              Icons.play_arrow,
-              color: Colors.white,
-              size: 90,
-            ),
+            child: Icon(Icons.play_arrow, color: Colors.white, size: 90),
           ),
 
         Positioned.fill(
@@ -296,10 +261,7 @@ class _ReelItemState extends State<ReelItem> {
                 gradient: LinearGradient(
                   begin: Alignment.bottomCenter,
                   end: Alignment.center,
-                  colors: [
-                    Colors.black87,
-                    Colors.transparent,
-                  ],
+                  colors: [Colors.black87, Colors.transparent],
                 ),
               ),
             ),
@@ -314,12 +276,10 @@ class _ReelItemState extends State<ReelItem> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-
                     Text(
                       widget.data['nama_makanan'] ?? "",
                       style: const TextStyle(
@@ -340,7 +300,6 @@ class _ReelItemState extends State<ReelItem> {
                         height: 1.4,
                       ),
                     ),
-
                   ],
                 ),
               ),
@@ -350,7 +309,6 @@ class _ReelItemState extends State<ReelItem> {
               Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-
                   GestureDetector(
                     onTap: toggleLike,
 
@@ -359,12 +317,8 @@ class _ReelItemState extends State<ReelItem> {
                       scale: isLiked ? 1.2 : 1,
 
                       child: Icon(
-                        isLiked
-                            ? Icons.favorite
-                            : Icons.favorite_border,
-                        color: isLiked
-                            ? Colors.red
-                            : Colors.white,
+                        isLiked ? Icons.favorite : Icons.favorite_border,
+                        color: isLiked ? Colors.red : Colors.white,
                         size: 34,
                       ),
                     ),
@@ -374,18 +328,13 @@ class _ReelItemState extends State<ReelItem> {
 
                   const Text(
                     "Like",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
                   ),
-
                 ],
               ),
             ],
           ),
         ),
-
       ],
     );
   }
