@@ -25,19 +25,17 @@ class YoloService {
     try {
       debugPrint("YOLO ▶ load model start...");
 
-      _vision = FlutterVision();
+      /// GPU delegate bisa crash di native level (SEGFAULT) pada device budget
+      /// (Adreno 610 dll) — tidak bisa di-catch oleh Dart try-catch.
+      /// Gunakan CPU langsung untuk stabilitas di semua device.
+      _modelLoaded = await _tryLoadModel(useGpu: false);
 
-      await _vision!.loadYoloModel(
-        labels: 'assets/models/labels.txt',
-        modelPath: 'assets/models/yolo.tflite',
-        modelVersion: "yolov8",
-        quantization: false,
-        numThreads: 4,
-        useGpu: false,
-      );
-
-      _modelLoaded = true;
-      debugPrint("YOLO ✅ model loaded");
+      if (_modelLoaded) {
+        debugPrint("YOLO ✅ model loaded");
+      } else {
+        debugPrint("YOLO ❌ model gagal dimuat");
+        _vision = null;
+      }
     } catch (e, s) {
       debugPrint("YOLO ❌ load model error: $e");
       debugPrint("$s");
@@ -53,11 +51,39 @@ class YoloService {
     }
   }
 
+  /// Load model dengan opsi GPU on/off
+  Future<bool> _tryLoadModel({required bool useGpu}) async {
+    try {
+      _vision = FlutterVision();
+
+      await _vision!.loadYoloModel(
+        labels: 'assets/models/labels.txt',
+        modelPath: 'assets/models/yolo.tflite',
+        modelVersion: "yolov8",
+        quantization: false,
+        numThreads: 2,
+        useGpu: useGpu,
+      );
+
+      debugPrint("YOLO ▶ loaded with ${useGpu ? 'GPU' : 'CPU'}");
+      return true;
+    } catch (e) {
+      debugPrint("YOLO ⚠️ ${useGpu ? 'GPU' : 'CPU'} load failed: $e");
+      _vision = null;
+      return false;
+    }
+  }
+
+  /// Deteksi objek pada file gambar.
+  /// [knownWidth] dan [knownHeight] bisa diisi jika dimensi sudah diketahui
+  /// (menghindari decode gambar ulang).
   Future<List<Map<String, dynamic>>> detect(
     String path, {
+    int? knownWidth,
+    int? knownHeight,
     double iouThreshold = 0.45,
-    double confThreshold = 0.25,
-    double classThreshold = 0.25,
+    double confThreshold = 0.15,
+    double classThreshold = 0.15,
   }) async {
     if (_loadCompleter != null && !_loadCompleter!.isCompleted) {
       await _loadCompleter!.future;
@@ -71,11 +97,20 @@ class YoloService {
     try {
       final bytes = await File(path).readAsBytes();
 
-      final codec = await ui.instantiateImageCodec(bytes);
-      final frame = await codec.getNextFrame();
-      final imageWidth = frame.image.width;
-      final imageHeight = frame.image.height;
-      frame.image.dispose();
+      int imageWidth;
+      int imageHeight;
+
+      /// Skip decode jika dimensi sudah diketahui dari caller
+      if (knownWidth != null && knownHeight != null) {
+        imageWidth = knownWidth;
+        imageHeight = knownHeight;
+      } else {
+        final codec = await ui.instantiateImageCodec(bytes);
+        final frame = await codec.getNextFrame();
+        imageWidth = frame.image.width;
+        imageHeight = frame.image.height;
+        frame.image.dispose();
+      }
 
       debugPrint(
         "YOLO ▶ detect image: ${imageWidth}x$imageHeight (${bytes.length} bytes)",
@@ -98,38 +133,6 @@ class YoloService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> detectOnFrame(
-    List<Uint8List> bytesList,
-    int imageHeight,
-    int imageWidth, {
-    double iouThreshold = 0.45,
-    double confThreshold = 0.25,
-    double classThreshold = 0.25,
-  }) async {
-    if (_loadCompleter != null && !_loadCompleter!.isCompleted) {
-      await _loadCompleter!.future;
-    }
-
-    if (!_modelLoaded || _vision == null) return [];
-
-    try {
-      final results = await _vision!.yoloOnFrame(
-        bytesList: bytesList,
-        imageHeight: imageHeight,
-        imageWidth: imageWidth,
-        iouThreshold: iouThreshold,
-        confThreshold: confThreshold,
-        classThreshold: classThreshold,
-      );
-
-      return _mapResults(results);
-    } catch (e, s) {
-      debugPrint("YOLO ❌ frame error: $e");
-      debugPrint("$s");
-      return [];
-    }
-  }
-
   List<Map<String, dynamic>> _mapResults(List<dynamic> results) {
     final List<Map<String, dynamic>> mapped = [];
 
@@ -147,7 +150,7 @@ class YoloService {
         final conf = (rawBox[4] as num).toDouble();
         final tag = r['tag'] as String;
 
-        if (conf < 0.3) continue;
+        if (conf < 0.15) continue;
 
         mapped.add({
           'label': tag,

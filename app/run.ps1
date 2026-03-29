@@ -1,13 +1,5 @@
-# =============================================
 # SmartCooks - Auto-detect IP & Flutter Run
-# =============================================
-# Detects your PC's local IP address and passes
-# it to `flutter run` via --dart-define.
-#
-# Usage:
-#   .\run.ps1           → run (auto-detect IP)
-#   .\run.ps1 -ip 10.0.0.5  → manual override
-# =============================================
+
 
 param(
     [string]$ip = ""

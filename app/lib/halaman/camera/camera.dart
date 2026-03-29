@@ -1,8 +1,8 @@
-import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -17,8 +17,7 @@ class CameraPage extends StatefulWidget {
   State<CameraPage> createState() => _CameraPageState();
 }
 
-class _CameraPageState extends State<CameraPage>
-    with SingleTickerProviderStateMixin {
+class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
   CameraController? _controller;
   List<CameraDescription>? cameras;
   int selectedCameraIndex = 0;
@@ -28,8 +27,6 @@ class _CameraPageState extends State<CameraPage>
 
   bool isCapturing = false;
   bool isDetecting = false;
-  bool _isProcessingFrame = false;
-  bool _isStreamRunning = false;
   bool _isSwitchingCamera = false;
 
   String? capturedPath;
@@ -38,9 +35,6 @@ class _CameraPageState extends State<CameraPage>
   List<Map<String, dynamic>> detections = [];
   List<String> confirmedIngredients = [];
 
-  List<Map<String, dynamic>> _liveDetections = [];
-  Size? _liveFrameSize;
-
   double _currentZoom = 1.0;
   double _minZoom = 1.0;
   double _maxZoom = 1.0;
@@ -48,11 +42,16 @@ class _CameraPageState extends State<CameraPage>
 
   FlashMode _flashMode = FlashMode.off;
 
+  /// Tap-to-focus
+  Offset? _focusPoint;
+  bool _showFocusIndicator = false;
+  late AnimationController _focusAnim;
+
   late AnimationController _shutterAnim;
   late Animation<double> _shutterScale;
 
-  DateTime _lastLiveInferenceAt = DateTime.fromMillisecondsSinceEpoch(0);
-  static const Duration _liveInferenceGap = Duration(milliseconds: 450);
+  /// Scanning animation controller
+  late AnimationController _scanAnim;
 
   @override
   void initState() {
@@ -69,6 +68,16 @@ class _CameraPageState extends State<CameraPage>
       end: 0.88,
     ).animate(CurvedAnimation(parent: _shutterAnim, curve: Curves.easeInOut));
 
+    _scanAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+
+    _focusAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+
     _initEverything();
   }
 
@@ -79,10 +88,11 @@ class _CameraPageState extends State<CameraPage>
 
   @override
   void dispose() {
-    _stopImageStream();
     _controller?.dispose();
     _yolo.dispose();
     _shutterAnim.dispose();
+    _scanAnim.dispose();
+    _focusAnim.dispose();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     super.dispose();
   }
@@ -97,7 +107,7 @@ class _CameraPageState extends State<CameraPage>
       );
       if (selectedCameraIndex == -1) selectedCameraIndex = 0;
 
-      await _createCameraController(startStream: true);
+      await _createCameraController();
 
       if (mounted) setState(() {});
     } catch (e) {
@@ -105,14 +115,13 @@ class _CameraPageState extends State<CameraPage>
     }
   }
 
-  Future<void> _createCameraController({required bool startStream}) async {
+  Future<void> _createCameraController() async {
     if (cameras == null || cameras!.isEmpty) return;
 
     _controller = CameraController(
       cameras![selectedCameraIndex],
-      ResolutionPreset.high,
+      ResolutionPreset.veryHigh,
       enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.yuv420,
     );
 
     await _controller!.initialize();
@@ -123,10 +132,6 @@ class _CameraPageState extends State<CameraPage>
     await _controller!.setZoomLevel(_currentZoom);
 
     await _controller!.setFlashMode(_flashMode);
-
-    if (startStream) {
-      await _startImageStream();
-    }
   }
 
   Future<void> switchCamera() async {
@@ -138,10 +143,8 @@ class _CameraPageState extends State<CameraPage>
     try {
       selectedCameraIndex = (selectedCameraIndex + 1) % cameras!.length;
 
-      await _stopImageStream();
       await _controller?.dispose();
-
-      await _createCameraController(startStream: true);
+      await _createCameraController();
 
       if (mounted) setState(() {});
     } catch (e) {
@@ -163,7 +166,31 @@ class _CameraPageState extends State<CameraPage>
     _controller?.setZoomLevel(_currentZoom);
   }
 
-  // ================== FIXED VERSION ==================
+  /// Tap-to-focus: fokus + exposure di titik yang di-tap
+  void _onTapToFocus(TapUpDetails details, BoxConstraints constraints) async {
+    if (_controller == null || !_controller!.value.isInitialized) return;
+
+    setState(() {
+      _focusPoint = details.localPosition;
+      _showFocusIndicator = true;
+    });
+
+    _focusAnim.forward(from: 0.0);
+
+    /// Hanya set FocusMode.auto (continuous autofocus) — aman di semua device.
+    /// setFocusPoint() dan setExposurePoint() bisa crash native (SEGFAULT)
+    /// pada beberapa device budget (Vivo, Realme dll) karena bug camera HAL.
+    try {
+      await _controller!.setFocusMode(FocusMode.auto);
+    } catch (e) {
+      debugPrint("FOCUS ERROR: $e");
+    }
+
+    /// Sembunyikan indikator setelah 1.5 detik
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _showFocusIndicator = false);
+    });
+  }
 
   void _toggleFlash() async {
     if (_controller == null || !_controller!.value.isInitialized) return;
@@ -193,8 +220,6 @@ class _CameraPageState extends State<CameraPage>
     }
   }
 
-  // ================== FIXED ICON ==================
-
   IconData get _flashIcon {
     switch (_flashMode) {
       case FlashMode.off:
@@ -208,92 +233,6 @@ class _CameraPageState extends State<CameraPage>
     }
   }
 
-  Future<void> _startImageStream() async {
-    if (_controller == null || !_controller!.value.isInitialized) return;
-    if (_isStreamRunning) return;
-
-    try {
-      await _controller!.startImageStream(_onCameraFrame);
-      _isStreamRunning = true;
-      debugPrint("LIVE ▶ image stream started");
-    } catch (e) {
-      debugPrint("LIVE ❌ start stream failed: $e");
-      _isStreamRunning = false;
-    }
-  }
-
-  Future<void> _stopImageStream() async {
-    if (_controller == null || !_controller!.value.isInitialized) return;
-    if (!_isStreamRunning) return;
-
-    try {
-      await _controller!.stopImageStream();
-      debugPrint("LIVE ▶ image stream stopped");
-    } catch (e) {
-      debugPrint("LIVE ❌ stop stream failed: $e");
-    } finally {
-      _isStreamRunning = false;
-    }
-  }
-
-  void _onCameraFrame(CameraImage image) {
-    if (_isProcessingFrame || !_yolo.isLoaded) return;
-
-    final now = DateTime.now();
-    if (now.difference(_lastLiveInferenceAt) < _liveInferenceGap) return;
-    _lastLiveInferenceAt = now;
-
-    _isProcessingFrame = true;
-
-    if (image.planes.isEmpty) {
-      _isProcessingFrame = false;
-      return;
-    }
-
-    final bytesList = image.planes.map((p) => p.bytes).toList();
-    final int w = image.width;
-    final int h = image.height;
-
-    _yolo
-        .detectOnFrame(
-          bytesList,
-          h,
-          w,
-          confThreshold: 0.25,
-          iouThreshold: 0.45,
-          classThreshold: 0.25,
-        )
-        .then((results) {
-          if (!mounted) return;
-
-          setState(() {
-            _liveDetections = results;
-            _liveFrameSize = Size(h.toDouble(), w.toDouble());
-          });
-        })
-        .whenComplete(() {
-          _isProcessingFrame = false;
-        });
-  }
-
-  Future<String> _prepareImage(String originalPath) async {
-    try {
-      final bytes = await File(originalPath).readAsBytes();
-      final codec = await ui.instantiateImageCodec(bytes);
-      final frame = await codec.getNextFrame();
-      _scanSourceSize = Size(
-        frame.image.width.toDouble(),
-        frame.image.height.toDouble(),
-      );
-      frame.image.dispose();
-      return originalPath;
-    } catch (e) {
-      debugPrint("ERROR PREPARE IMAGE: $e");
-      _scanSourceSize = null;
-      return originalPath;
-    }
-  }
-
   List<String> _extractConfirmedIngredients(List<Map<String, dynamic>> items) {
     return items
         .map((e) => e['label'].toString().replaceAll('_', ' ').toUpperCase())
@@ -301,12 +240,21 @@ class _CameraPageState extends State<CameraPage>
         .toList();
   }
 
-  Future<void> _runDetection(String imagePath) async {
+  Future<void> _runDetection(
+    String imagePath, {
+    int? knownWidth,
+    int? knownHeight,
+  }) async {
     if (!mounted) return;
     setState(() => isDetecting = true);
+    _scanAnim.repeat();
 
     try {
-      final results = await _yolo.detect(imagePath);
+      final results = await _yolo.detect(
+        imagePath,
+        knownWidth: knownWidth,
+        knownHeight: knownHeight,
+      );
       debugPrint("HASIL DETEKSI: $results");
 
       if (!mounted) return;
@@ -315,10 +263,12 @@ class _CameraPageState extends State<CameraPage>
         confirmedIngredients = _extractConfirmedIngredients(results);
         isDetecting = false;
       });
+      _scanAnim.stop();
     } catch (e) {
       debugPrint("ERROR YOLO: $e");
       if (!mounted) return;
       setState(() => isDetecting = false);
+      _scanAnim.stop();
     }
   }
 
@@ -331,38 +281,36 @@ class _CameraPageState extends State<CameraPage>
     setState(() => isCapturing = true);
 
     try {
-      await _stopImageStream();
-      await Future.delayed(const Duration(milliseconds: 120));
-
       final image = await _controller!.takePicture();
       debugPrint("Foto diambil: ${image.path}");
 
       if (!mounted) return;
 
+      /// Decode gambar 1x untuk ambil dimensi
       final bytes = await File(image.path).readAsBytes();
       final codec = await ui.instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
-      final shotSize = Size(
-        frame.image.width.toDouble(),
-        frame.image.height.toDouble(),
-      );
+      final imgWidth = frame.image.width;
+      final imgHeight = frame.image.height;
+      final shotSize = Size(imgWidth.toDouble(), imgHeight.toDouble());
       frame.image.dispose();
 
       if (!mounted) return;
       setState(() {
         capturedPath = image.path;
         _scanSourceSize = shotSize;
-        _liveDetections = [];
-        _liveFrameSize = null;
       });
 
-      await _runDetection(image.path);
+      /// Pass dimensi yang sudah diketahui, skip decode ulang di yolo_service
+      await _runDetection(
+        image.path,
+        knownWidth: imgWidth,
+        knownHeight: imgHeight,
+      );
     } catch (e) {
       debugPrint("ERROR TAKE PICTURE: $e");
       if (!mounted) return;
       setState(() => isCapturing = false);
-
-      await _startImageStream();
     } finally {
       if (mounted) {
         setState(() => isCapturing = false);
@@ -372,17 +320,12 @@ class _CameraPageState extends State<CameraPage>
 
   Future<void> pickFromGallery() async {
     try {
-      await _stopImageStream();
-
       final image = await _imagePicker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 100,
       );
 
-      if (image == null) {
-        await _startImageStream();
-        return;
-      }
+      if (image == null) return;
 
       if (!mounted) return;
 
@@ -392,15 +335,29 @@ class _CameraPageState extends State<CameraPage>
       });
 
       try {
-        final processedPath = await _prepareImage(image.path);
+        /// Decode gambar 1x untuk ambil dimensi
+        final bytes = await File(image.path).readAsBytes();
+        final codec = await ui.instantiateImageCodec(bytes);
+        final frame = await codec.getNextFrame();
+        final imgWidth = frame.image.width;
+        final imgHeight = frame.image.height;
+        final shotSize = Size(imgWidth.toDouble(), imgHeight.toDouble());
+        frame.image.dispose();
+
         if (!mounted) return;
 
         setState(() {
-          capturedPath = processedPath;
+          capturedPath = image.path;
+          _scanSourceSize = shotSize;
           isCapturing = false;
         });
 
-        await _runDetection(processedPath);
+        /// Pass dimensi yang sudah diketahui
+        await _runDetection(
+          image.path,
+          knownWidth: imgWidth,
+          knownHeight: imgHeight,
+        );
       } catch (e) {
         debugPrint("ERROR YOLO GALERI: $e");
         if (!mounted) return;
@@ -416,7 +373,6 @@ class _CameraPageState extends State<CameraPage>
         isCapturing = false;
         isDetecting = false;
       });
-      await _startImageStream();
     }
   }
 
@@ -426,13 +382,9 @@ class _CameraPageState extends State<CameraPage>
       _scanSourceSize = null;
       detections = [];
       confirmedIngredients = [];
-      _liveDetections = [];
-      _liveFrameSize = null;
       isDetecting = false;
       isCapturing = false;
     });
-
-    _startImageStream();
   }
 
   @override
@@ -463,23 +415,7 @@ class _CameraPageState extends State<CameraPage>
                     child: SizedBox(
                       width: _controller!.value.previewSize!.height,
                       height: _controller!.value.previewSize!.width,
-                      child: Stack(
-                        children: [
-                          CameraPreview(_controller!),
-                          if (_liveDetections.isNotEmpty &&
-                              _liveFrameSize != null)
-                            Positioned.fill(
-                              child: IgnorePointer(
-                                child: CustomPaint(
-                                  painter: BoundingBoxPainter(
-                                    _liveDetections,
-                                    sourceSize: _liveFrameSize!,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
+                      child: CameraPreview(_controller!),
                     ),
                   ),
                 ),
@@ -630,10 +566,51 @@ class _CameraPageState extends State<CameraPage>
 
             if (isReady)
               Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onScaleStart: _onScaleStart,
-                  onScaleUpdate: _onScaleUpdate,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onScaleStart: _onScaleStart,
+                      onScaleUpdate: _onScaleUpdate,
+                      onTapUp: (details) => _onTapToFocus(details, constraints),
+                    );
+                  },
+                ),
+              ),
+
+            /// Focus indicator
+            if (isReady && _showFocusIndicator && _focusPoint != null)
+              Positioned(
+                left: _focusPoint!.dx - 30,
+                top: _focusPoint!.dy - 30,
+                child: AnimatedBuilder(
+                  animation: _focusAnim,
+                  builder: (context, child) {
+                    final scale = 1.4 - (0.4 * _focusAnim.value);
+                    final opacity = 0.3 + (0.7 * _focusAnim.value);
+                    return Transform.scale(
+                      scale: scale,
+                      child: Opacity(opacity: opacity, child: child),
+                    );
+                  },
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFFF57C00),
+                        width: 2,
+                      ),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.center_focus_strong_rounded,
+                        color: Color(0xFFF57C00),
+                        size: 20,
+                      ),
+                    ),
+                  ),
                 ),
               ),
 
@@ -832,44 +809,8 @@ class _CameraPageState extends State<CameraPage>
             ),
           ),
 
-          if (isDetecting)
-            Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 28,
-                  vertical: 20,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.7),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: const Color(0xFFF57C00).withValues(alpha: 0.3),
-                  ),
-                ),
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 36,
-                      height: 36,
-                      child: CircularProgressIndicator(
-                        color: Color(0xFFF57C00),
-                        strokeWidth: 2.5,
-                      ),
-                    ),
-                    SizedBox(height: 14),
-                    Text(
-                      "Mendeteksi bahan...",
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          /// Scanning Animation
+          if (isDetecting) _buildScanningOverlay(),
 
           if (!isDetecting)
             Positioned(
@@ -1133,6 +1074,74 @@ class _CameraPageState extends State<CameraPage>
     );
   }
 
+  /// Scanning animation overlay — pulse + scan line
+  Widget _buildScanningOverlay() {
+    return Center(
+      child: AnimatedBuilder(
+        animation: _scanAnim,
+        builder: (context, child) {
+          final pulseScale = 1.0 + (_scanAnim.value * 0.08);
+          final opacity = 0.6 + (0.4 * (1.0 - (_scanAnim.value * 2 - 1).abs()));
+
+          return Transform.scale(
+            scale: pulseScale,
+            child: Opacity(opacity: opacity, child: child),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.75),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: const Color(0xFFF57C00).withValues(alpha: 0.4),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFF57C00).withValues(alpha: 0.15),
+                blurRadius: 30,
+                spreadRadius: 5,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 44,
+                height: 44,
+                child: CircularProgressIndicator(
+                  color: const Color(0xFFF57C00),
+                  strokeWidth: 3,
+                  value: null,
+                  backgroundColor: const Color(
+                    0xFFF57C00,
+                  ).withValues(alpha: 0.15),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                "Mendeteksi bahan...",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                "AI sedang menganalisis gambar",
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _glassButton({
     required IconData icon,
     required VoidCallback onTap,
@@ -1235,7 +1244,7 @@ class _CameraPageState extends State<CameraPage>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _InfoRow(icon: Icons.zoom_in, text: "Pinch atau slider untuk zoom"),
+            _InfoRow(icon: Icons.zoom_in, text: "Pinch untuk zoom"),
             SizedBox(height: 8),
             _InfoRow(icon: Icons.camera_alt, text: "Ambil foto bahan makanan"),
             SizedBox(height: 8),
@@ -1469,5 +1478,8 @@ class BoundingBoxPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant BoundingBoxPainter oldDelegate) {
+    return !listEquals(oldDelegate.detections, detections) ||
+        oldDelegate.sourceSize != sourceSize;
+  }
 }
