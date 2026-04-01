@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
@@ -250,17 +251,31 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
     _scanAnim.repeat();
 
     try {
-      final results = await _yolo.detect(
+      /// Scale 1: Deteksi pada gambar penuh (objek dekat/besar)
+      final fullResults = await _yolo.detect(
         imagePath,
         knownWidth: knownWidth,
         knownHeight: knownHeight,
       );
-      debugPrint("HASIL DETEKSI: $results");
+
+      /// Scale 2: Crop center 50% → objek jauh tampil 2× lebih besar
+      final cropResults = await _detectOnCenterCrop(
+        imagePath,
+        fullWidth: knownWidth ?? 1,
+        fullHeight: knownHeight ?? 1,
+      );
+
+      /// Gabungkan dan deduplikasi (IoU > 0.3 = objek sama)
+      final merged = _mergeDetections(fullResults, cropResults);
+
+      debugPrint(
+        "DETEKSI: full=${fullResults.length}, crop=${cropResults.length}, merged=${merged.length}",
+      );
 
       if (!mounted) return;
       setState(() {
-        detections = results;
-        confirmedIngredients = _extractConfirmedIngredients(results);
+        detections = merged;
+        confirmedIngredients = _extractConfirmedIngredients(merged);
         isDetecting = false;
       });
       _scanAnim.stop();
@@ -270,6 +285,133 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
       setState(() => isDetecting = false);
       _scanAnim.stop();
     }
+  }
+
+  /// Crop center 50% gambar, jalankan YOLO, peta koordinat kembali ke penuh.
+  Future<List<Map<String, dynamic>>> _detectOnCenterCrop(
+    String imagePath, {
+    required int fullWidth,
+    required int fullHeight,
+  }) async {
+    try {
+      final bytes = await File(imagePath).readAsBytes();
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final originalImage = frame.image;
+
+      /// Area crop: center 50%
+      final cropLeft = (fullWidth * 0.25).round();
+      final cropTop = (fullHeight * 0.25).round();
+      final cropWidth = (fullWidth * 0.5).round();
+      final cropHeight = (fullHeight * 0.5).round();
+
+      /// Render crop via Canvas (dart:ui, tanpa dependency tambahan)
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      canvas.drawImageRect(
+        originalImage,
+        Rect.fromLTWH(
+          cropLeft.toDouble(),
+          cropTop.toDouble(),
+          cropWidth.toDouble(),
+          cropHeight.toDouble(),
+        ),
+        Rect.fromLTWH(0, 0, cropWidth.toDouble(), cropHeight.toDouble()),
+        Paint(),
+      );
+      final picture = recorder.endRecording();
+      final croppedImage = await picture.toImage(cropWidth, cropHeight);
+
+      /// Encode ke PNG
+      final pngData = await croppedImage.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+      originalImage.dispose();
+      croppedImage.dispose();
+
+      if (pngData == null) return [];
+
+      /// Simpan ke temp file
+      final tempPath = '${Directory.systemTemp.path}/sc_crop.png';
+      await File(tempPath).writeAsBytes(pngData.buffer.asUint8List());
+
+      /// Deteksi pada crop (dimensi sudah diketahui → skip decode ulang)
+      final results = await _yolo.detect(
+        tempPath,
+        knownWidth: cropWidth,
+        knownHeight: cropHeight,
+      );
+
+      /// Peta koordinat bbox kembali ke gambar penuh
+      for (final det in results) {
+        final box = (det['box'] as List).cast<double>();
+        det['box'] = [
+          box[0] + cropLeft,
+          box[1] + cropTop,
+          box[2] + cropLeft,
+          box[3] + cropTop,
+        ];
+      }
+
+      /// Bersihkan temp file
+      try {
+        await File(tempPath).delete();
+      } catch (_) {}
+
+      return results;
+    } catch (e) {
+      debugPrint("CROP DETECT ERROR: $e");
+      return [];
+    }
+  }
+
+  /// Gabungkan 2 set deteksi, hapus duplikat berdasarkan IoU.
+  List<Map<String, dynamic>> _mergeDetections(
+    List<Map<String, dynamic>> primary,
+    List<Map<String, dynamic>> secondary,
+  ) {
+    final merged = List<Map<String, dynamic>>.from(primary);
+
+    for (final det in secondary) {
+      final box = (det['box'] as List).cast<double>();
+      bool isDuplicate = false;
+
+      for (final existing in merged) {
+        final existingBox = (existing['box'] as List).cast<double>();
+        if (_computeIoU(box, existingBox) > 0.3) {
+          isDuplicate = true;
+          /// Simpan yang confidence lebih tinggi
+          if ((det['confidence'] as double) >
+              (existing['confidence'] as double)) {
+            existing['confidence'] = det['confidence'];
+            existing['box'] = det['box'];
+          }
+          break;
+        }
+      }
+
+      if (!isDuplicate) {
+        merged.add(det);
+      }
+    }
+
+    return merged;
+  }
+
+  /// Hitung Intersection over Union antara 2 bounding box.
+  double _computeIoU(List<double> a, List<double> b) {
+    final x1 = max(a[0], b[0]);
+    final y1 = max(a[1], b[1]);
+    final x2 = min(a[2], b[2]);
+    final y2 = min(a[3], b[3]);
+
+    if (x2 <= x1 || y2 <= y1) return 0.0;
+
+    final intersection = (x2 - x1) * (y2 - y1);
+    final areaA = (a[2] - a[0]) * (a[3] - a[1]);
+    final areaB = (b[2] - b[0]) * (b[3] - b[1]);
+
+    return intersection / (areaA + areaB - intersection);
   }
 
   Future<void> takePicture() async {

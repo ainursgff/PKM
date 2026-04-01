@@ -11,6 +11,7 @@ labu
 minyak
 nasi_p
 sapi
+telur
 terong
 tomat
 wortel
