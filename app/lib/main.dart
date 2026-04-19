@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'services/api_service.dart';
 import 'halaman/reels.dart';
 import 'halaman/camera/camera.dart';
+import 'halaman/detail_makanan.dart';
 import 'config.dart';
 
 import 'partials/navbar.dart';
@@ -13,6 +14,13 @@ void main() {
 }
 
 String get imageBase => ServerConfig.imageBase;
+
+/// Resolve gambar: jika sudah URL lengkap, pakai langsung. Jika nama file, tambahkan imageBase.
+String resolveImageUrl(String? foto) {
+  if (foto == null || foto.isEmpty) return '';
+  if (foto.startsWith('http')) return foto;
+  return '$imageBase$foto';
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -242,7 +250,7 @@ class _HomePageState extends State<HomePage>
 
                                   child: ClipOval(
                                     child: Image.network(
-                                      "$imageBase${item['foto_utama']}",
+                                      resolveImageUrl(item['foto_utama']?.toString()),
                                       fit: BoxFit.cover,
                                     ),
                                   ),
@@ -310,7 +318,16 @@ class _HomePageState extends State<HomePage>
         itemBuilder: (context, index) {
           final item = makanan[index];
 
-          return Container(
+          return GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DetailMakananPage(makanan: item),
+                ),
+              );
+            },
+            child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(25),
               color: Colors.white,
@@ -334,7 +351,7 @@ class _HomePageState extends State<HomePage>
                   ),
 
                   child: Image.network(
-                    "$imageBase${item['foto_utama']}",
+                    resolveImageUrl(item['foto_utama']?.toString()),
                     height: 120,
                     width: double.infinity,
                     fit: BoxFit.cover,
@@ -354,6 +371,7 @@ class _HomePageState extends State<HomePage>
                 ),
               ],
             ),
+          ),
           );
         },
       ),

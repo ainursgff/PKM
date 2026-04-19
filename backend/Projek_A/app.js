@@ -1,3 +1,4 @@
+require('dotenv').config();
 const createError = require('http-errors');
 const express = require('express');
 const path = require('path');
@@ -44,6 +45,8 @@ app.use((req, res, next) => {
 app.use('/', indexRouter);
 app.use('/api/makanan', makananRouter);
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/ai', require('./routes/ai'));
+app.use('/api/detect', require('./routes/detect'));
 
 // 404
 app.use(function(req, res, next) { next(createError(404)); });
@@ -55,5 +58,42 @@ app.use(function(err, req, res, next) {
     res.status(err.status || 500);
     res.render('error');
 });
+
+// ==========================================
+// TANGANI AI DAEMON (Python Microservice)
+// ==========================================
+const { spawn } = require('child_process');
+const fs = require('fs');
+const daemonScript = path.join(__dirname, 'scripts', 'detect_server.py');
+const modelFile = path.join(__dirname, 'assets', 'models', 'best.pt');
+
+if (fs.existsSync(daemonScript) && fs.existsSync(modelFile)) {
+    console.log("Menghidupkan AI Daemon Server (Port 5001)...");
+    const aiDaemon = spawn('python', [daemonScript, modelFile], {
+        stdio: 'inherit',
+        detached: false
+    });
+
+    aiDaemon.on('error', (err) => {
+        console.error("AI Daemon gagal dijalankan:", err.message);
+    });
+
+    aiDaemon.on('exit', (code) => {
+        if (code !== null && code !== 0) {
+            console.error(`AI Daemon keluar dengan kode ${code}`);
+        }
+    });
+
+    // Bersihkan proses Python saat Node.js berhenti
+    const cleanup = () => {
+        try { aiDaemon.kill(); } catch (_) {}
+    };
+    process.on('SIGINT', cleanup);
+    process.on('SIGTERM', cleanup);
+    process.on('exit', cleanup);
+} else {
+    if (!fs.existsSync(daemonScript)) console.warn("AI Daemon script tidak ditemukan:", daemonScript);
+    if (!fs.existsSync(modelFile)) console.warn("Model YOLO tidak ditemukan:", modelFile);
+}
 
 module.exports = app;

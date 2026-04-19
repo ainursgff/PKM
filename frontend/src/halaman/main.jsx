@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search, ChefHat, TrendingUp, Clock, Users, Star,
   Play, ArrowRight, Flame, Sparkles, Menu, X,
@@ -10,6 +11,7 @@ import ServerConfig from '../config';
 import ApiService from '../services/api_service';
 
 export default function MainPage() {
+  const navigate = useNavigate();
   const [makanan, setMakanan] = useState([]);
   const [trending, setTrending] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -103,7 +105,7 @@ export default function MainPage() {
             </button>
           </div>
           <div className="topbar-right">
-            <button className="btn-login">
+            <button className="btn-login" onClick={() => navigate('/login')}>
               <LogIn size={16} />
               <span>Masuk</span>
             </button>

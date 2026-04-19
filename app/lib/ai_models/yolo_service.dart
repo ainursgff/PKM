@@ -1,82 +1,23 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui' as ui;
-
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_vision/flutter_vision.dart';
+import 'package:http/http.dart' as http;
+import '../config.dart';
 
 class YoloService {
-  FlutterVision? _vision;
   bool _modelLoaded = false;
   bool get isLoaded => _modelLoaded;
 
-  Completer<void>? _loadCompleter;
-
   Future<void> loadModel() async {
-    if (_modelLoaded) return;
-
-    if (_loadCompleter != null) {
-      await _loadCompleter!.future;
-      return;
-    }
-
-    _loadCompleter = Completer<void>();
-
-    try {
-      debugPrint("YOLO ▶ load model start...");
-
-      /// GPU delegate bisa crash di native level (SEGFAULT) pada device budget
-      /// (Adreno 610 dll) — tidak bisa di-catch oleh Dart try-catch.
-      /// Gunakan CPU langsung untuk stabilitas di semua device.
-      _modelLoaded = await _tryLoadModel(useGpu: false);
-
-      if (_modelLoaded) {
-        debugPrint("YOLO ✅ model loaded");
-      } else {
-        debugPrint("YOLO ❌ model gagal dimuat");
-        _vision = null;
-      }
-    } catch (e, s) {
-      debugPrint("YOLO ❌ load model error: $e");
-      debugPrint("$s");
-      _modelLoaded = false;
-      _vision = null;
-    } finally {
-      if (_loadCompleter != null && !_loadCompleter!.isCompleted) {
-        _loadCompleter!.complete();
-      }
-      if (!_modelLoaded) {
-        _loadCompleter = null;
-      }
-    }
+    // Karena diproses di Backend, kita tidak perlu memuat model lokal.
+    // Kita cukup set true agar CameraController tahu siap memotret.
+    debugPrint("YOLO ▶ Ping server...");
+    _modelLoaded = true;
+    debugPrint("YOLO ✅ API Ready");
   }
 
-  /// Load model dengan opsi GPU on/off
-  Future<bool> _tryLoadModel({required bool useGpu}) async {
-    try {
-      _vision = FlutterVision();
-
-      await _vision!.loadYoloModel(
-        labels: 'assets/models/labels.txt',
-        modelPath: 'assets/models/yolo.tflite',
-        modelVersion: "yolov8",
-        quantization: false,
-        numThreads: 2,
-        useGpu: useGpu,
-      );
-
-      debugPrint("YOLO ▶ loaded with ${useGpu ? 'GPU' : 'CPU'}");
-      return true;
-    } catch (e) {
-      debugPrint("YOLO ⚠️ ${useGpu ? 'GPU' : 'CPU'} load failed: $e");
-      _vision = null;
-      return false;
-    }
-  }
-
-  /// Deteksi objek pada file gambar.
-  /// [knownWidth] dan [knownHeight] bisa diisi jika dimensi sudah diketahui
-  /// (menghindari decode gambar ulang).
+  /// Deteksi menggunakan Backend API
   Future<List<Map<String, dynamic>>> detect(
     String path, {
     int? knownWidth,
@@ -85,47 +26,49 @@ class YoloService {
     double confThreshold = 0.15,
     double classThreshold = 0.15,
   }) async {
-    if (_loadCompleter != null && !_loadCompleter!.isCompleted) {
-      await _loadCompleter!.future;
-    }
-
-    if (!_modelLoaded || _vision == null) {
-      debugPrint("YOLO ❌ model not ready");
+    if (!_modelLoaded) {
+      debugPrint("YOLO ❌ service not ready");
       return [];
     }
 
     try {
-      final bytes = await File(path).readAsBytes();
+      final file = File(path);
+      final fileSize = await file.length();
+      final ext = path.split('.').last.toLowerCase();
+      debugPrint("YOLO ▶ sending image to API: $path");
+      debugPrint("YOLO ▶ file size: ${(fileSize / 1024).toStringAsFixed(1)} KB, ext: $ext");
 
-      int imageWidth;
-      int imageHeight;
+      final url = Uri.parse('${ServerConfig.apiBase}/detect');
+      final request = http.MultipartRequest('POST', url);
 
-      /// Skip decode jika dimensi sudah diketahui dari caller
-      if (knownWidth != null && knownHeight != null) {
-        imageWidth = knownWidth;
-        imageHeight = knownHeight;
+      request.files.add(await http.MultipartFile.fromPath('image', path));
+
+      final streamedRes = await request.send();
+      final response = await http.Response.fromStream(streamedRes);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonArr = jsonDecode(response.body);
+
+        final List<Map<String, dynamic>> results = [];
+        for (var item in jsonArr) {
+          final rawBox = item['box'] as List;
+          final box = rawBox.map((v) => (v as num).toDouble()).toList();
+
+          results.add({
+            'label': item['label'],
+            'confidence': (item['confidence'] as num).toDouble(),
+            'box': box,
+          });
+        }
+
+        debugPrint("YOLO ✅ API returned ${results.length} objects");
+        return results;
       } else {
-        final codec = await ui.instantiateImageCodec(bytes);
-        final frame = await codec.getNextFrame();
-        imageWidth = frame.image.width;
-        imageHeight = frame.image.height;
-        frame.image.dispose();
+        debugPrint(
+          "YOLO ❌ Server error: ${response.statusCode} - ${response.body}",
+        );
+        return [];
       }
-
-      debugPrint(
-        "YOLO ▶ detect image: ${imageWidth}x$imageHeight (${bytes.length} bytes)",
-      );
-
-      final results = await _vision!.yoloOnImage(
-        bytesList: bytes,
-        imageHeight: imageHeight,
-        imageWidth: imageWidth,
-        iouThreshold: iouThreshold,
-        confThreshold: confThreshold,
-        classThreshold: classThreshold,
-      );
-
-      return _mapResults(results);
     } catch (e, s) {
       debugPrint("YOLO ❌ detect error: $e");
       debugPrint("$s");
@@ -133,42 +76,7 @@ class YoloService {
     }
   }
 
-  List<Map<String, dynamic>> _mapResults(List<dynamic> results) {
-    final List<Map<String, dynamic>> mapped = [];
-
-    for (final r in results) {
-      try {
-        if (r['box'] == null || r['tag'] == null) continue;
-
-        final rawBox = (r['box'] as List);
-        if (rawBox.length < 5) continue;
-
-        final x1 = (rawBox[0] as num).toDouble();
-        final y1 = (rawBox[1] as num).toDouble();
-        final x2 = (rawBox[2] as num).toDouble();
-        final y2 = (rawBox[3] as num).toDouble();
-        final conf = (rawBox[4] as num).toDouble();
-        final tag = r['tag'] as String;
-
-        if (conf < 0.15) continue;
-
-        mapped.add({
-          'label': tag,
-          'confidence': conf,
-          'box': [x1, y1, x2, y2],
-        });
-      } catch (_) {
-        continue;
-      }
-    }
-
-    return mapped;
-  }
-
   void dispose() {
-    _vision?.closeYoloModel();
-    _vision = null;
     _modelLoaded = false;
-    _loadCompleter = null;
   }
 }

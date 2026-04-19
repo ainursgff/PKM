@@ -138,7 +138,7 @@ class _EditIngredientsSheetState extends State<EditIngredientsSheet> {
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
                           color: Colors.black26,
-                          border: Border.all(color: Colors.white.withOpacity(0.1)),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(

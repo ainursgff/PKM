@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:math';
+
 import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
@@ -8,7 +8,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
 import '../../ai_models/yolo_service.dart';
+import '../../config.dart';
 import 'edit.dart';
 
 class CameraPage extends StatefulWidget {
@@ -18,7 +22,7 @@ class CameraPage extends StatefulWidget {
   State<CameraPage> createState() => _CameraPageState();
 }
 
-class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
+class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin, WidgetsBindingObserver {
   CameraController? _controller;
   List<CameraDescription>? cameras;
   int selectedCameraIndex = 0;
@@ -40,6 +44,7 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
   double _minZoom = 1.0;
   double _maxZoom = 1.0;
   double _baseZoom = 1.0;
+  DateTime? _lastZoomTime;
 
   FlashMode _flashMode = FlashMode.off;
 
@@ -57,6 +62,7 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
@@ -89,6 +95,7 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller?.dispose();
     _yolo.dispose();
     _shutterAnim.dispose();
@@ -96,6 +103,19 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
     _focusAnim.dispose();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      _controller?.dispose();
+      _controller = null; 
+    } else if (state == AppLifecycleState.resumed) {
+      if (_controller != null) return; // Mencegah double-inits jika hanya inactive!
+      _createCameraController().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
   }
 
   Future<void> initCamera() async {
@@ -121,7 +141,7 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
 
     _controller = CameraController(
       cameras![selectedCameraIndex],
-      ResolutionPreset.veryHigh,
+      ResolutionPreset.veryHigh, // CameraX: aman di semua GPU, kualitas HD untuk deteksi optimal
       enableAudio: false,
     );
 
@@ -163,8 +183,16 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
     if (_controller == null || !_controller!.value.isInitialized) return;
 
     final newZoom = (_baseZoom * details.scale).clamp(_minZoom, _maxZoom);
+    if (newZoom == _currentZoom) return;
+
     setState(() => _currentZoom = newZoom);
-    _controller?.setZoomLevel(_currentZoom);
+
+    // Throttle IPC Panggilan Native Android (Mencegah I/Camera spam refreshPreviewCaptureSession)
+    final now = DateTime.now();
+    if (_lastZoomTime == null || now.difference(_lastZoomTime!).inMilliseconds > 100) {
+      _lastZoomTime = now;
+      _controller?.setZoomLevel(_currentZoom);
+    }
   }
 
   /// Tap-to-focus: fokus + exposure di titik yang di-tap
@@ -251,31 +279,18 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
     _scanAnim.repeat();
 
     try {
-      /// Scale 1: Deteksi pada gambar penuh (objek dekat/besar)
-      final fullResults = await _yolo.detect(
+      final results = await _yolo.detect(
         imagePath,
         knownWidth: knownWidth,
         knownHeight: knownHeight,
       );
 
-      /// Scale 2: Crop center 50% → objek jauh tampil 2× lebih besar
-      final cropResults = await _detectOnCenterCrop(
-        imagePath,
-        fullWidth: knownWidth ?? 1,
-        fullHeight: knownHeight ?? 1,
-      );
-
-      /// Gabungkan dan deduplikasi (IoU > 0.3 = objek sama)
-      final merged = _mergeDetections(fullResults, cropResults);
-
-      debugPrint(
-        "DETEKSI: full=${fullResults.length}, crop=${cropResults.length}, merged=${merged.length}",
-      );
+      debugPrint("DETEKSI YOLO BERHASIL: ${results.length} objek");
 
       if (!mounted) return;
       setState(() {
-        detections = merged;
-        confirmedIngredients = _extractConfirmedIngredients(merged);
+        detections = results;
+        confirmedIngredients = _extractConfirmedIngredients(results);
         isDetecting = false;
       });
       _scanAnim.stop();
@@ -285,133 +300,6 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
       setState(() => isDetecting = false);
       _scanAnim.stop();
     }
-  }
-
-  /// Crop center 50% gambar, jalankan YOLO, peta koordinat kembali ke penuh.
-  Future<List<Map<String, dynamic>>> _detectOnCenterCrop(
-    String imagePath, {
-    required int fullWidth,
-    required int fullHeight,
-  }) async {
-    try {
-      final bytes = await File(imagePath).readAsBytes();
-      final codec = await ui.instantiateImageCodec(bytes);
-      final frame = await codec.getNextFrame();
-      final originalImage = frame.image;
-
-      /// Area crop: center 50%
-      final cropLeft = (fullWidth * 0.25).round();
-      final cropTop = (fullHeight * 0.25).round();
-      final cropWidth = (fullWidth * 0.5).round();
-      final cropHeight = (fullHeight * 0.5).round();
-
-      /// Render crop via Canvas (dart:ui, tanpa dependency tambahan)
-      final recorder = ui.PictureRecorder();
-      final canvas = Canvas(recorder);
-      canvas.drawImageRect(
-        originalImage,
-        Rect.fromLTWH(
-          cropLeft.toDouble(),
-          cropTop.toDouble(),
-          cropWidth.toDouble(),
-          cropHeight.toDouble(),
-        ),
-        Rect.fromLTWH(0, 0, cropWidth.toDouble(), cropHeight.toDouble()),
-        Paint(),
-      );
-      final picture = recorder.endRecording();
-      final croppedImage = await picture.toImage(cropWidth, cropHeight);
-
-      /// Encode ke PNG
-      final pngData = await croppedImage.toByteData(
-        format: ui.ImageByteFormat.png,
-      );
-      originalImage.dispose();
-      croppedImage.dispose();
-
-      if (pngData == null) return [];
-
-      /// Simpan ke temp file
-      final tempPath = '${Directory.systemTemp.path}/sc_crop.png';
-      await File(tempPath).writeAsBytes(pngData.buffer.asUint8List());
-
-      /// Deteksi pada crop (dimensi sudah diketahui → skip decode ulang)
-      final results = await _yolo.detect(
-        tempPath,
-        knownWidth: cropWidth,
-        knownHeight: cropHeight,
-      );
-
-      /// Peta koordinat bbox kembali ke gambar penuh
-      for (final det in results) {
-        final box = (det['box'] as List).cast<double>();
-        det['box'] = [
-          box[0] + cropLeft,
-          box[1] + cropTop,
-          box[2] + cropLeft,
-          box[3] + cropTop,
-        ];
-      }
-
-      /// Bersihkan temp file
-      try {
-        await File(tempPath).delete();
-      } catch (_) {}
-
-      return results;
-    } catch (e) {
-      debugPrint("CROP DETECT ERROR: $e");
-      return [];
-    }
-  }
-
-  /// Gabungkan 2 set deteksi, hapus duplikat berdasarkan IoU.
-  List<Map<String, dynamic>> _mergeDetections(
-    List<Map<String, dynamic>> primary,
-    List<Map<String, dynamic>> secondary,
-  ) {
-    final merged = List<Map<String, dynamic>>.from(primary);
-
-    for (final det in secondary) {
-      final box = (det['box'] as List).cast<double>();
-      bool isDuplicate = false;
-
-      for (final existing in merged) {
-        final existingBox = (existing['box'] as List).cast<double>();
-        if (_computeIoU(box, existingBox) > 0.3) {
-          isDuplicate = true;
-          /// Simpan yang confidence lebih tinggi
-          if ((det['confidence'] as double) >
-              (existing['confidence'] as double)) {
-            existing['confidence'] = det['confidence'];
-            existing['box'] = det['box'];
-          }
-          break;
-        }
-      }
-
-      if (!isDuplicate) {
-        merged.add(det);
-      }
-    }
-
-    return merged;
-  }
-
-  /// Hitung Intersection over Union antara 2 bounding box.
-  double _computeIoU(List<double> a, List<double> b) {
-    final x1 = max(a[0], b[0]);
-    final y1 = max(a[1], b[1]);
-    final x2 = min(a[2], b[2]);
-    final y2 = min(a[3], b[3]);
-
-    if (x2 <= x1 || y2 <= y1) return 0.0;
-
-    final intersection = (x2 - x1) * (y2 - y1);
-    final areaA = (a[2] - a[0]) * (a[3] - a[1]);
-    final areaB = (b[2] - b[0]) * (b[3] - b[1]);
-
-    return intersection / (areaA + areaB - intersection);
   }
 
   Future<void> takePicture() async {
@@ -428,14 +316,21 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
 
       if (!mounted) return;
 
-      /// Decode gambar 1x untuk ambil dimensi
-      final bytes = await File(image.path).readAsBytes();
+      /// Decode gambar 1x untuk ambil dimensi ASLI (tanpa swap!)
+      /// Koordinat YOLO backend selalu relatif terhadap dimensi asli gambar.
+      /// Swap W/H akan merusak mapping bounding box untuk foto landscape.
+      final imageFile = File(image.path);
+      final fileSize = await imageFile.length();
+      final bytes = await imageFile.readAsBytes();
       final codec = await ui.instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
-      final imgWidth = frame.image.width;
-      final imgHeight = frame.image.height;
-      final shotSize = Size(imgWidth.toDouble(), imgHeight.toDouble());
+      final imgW = frame.image.width.toDouble();
+      final imgH = frame.image.height.toDouble();
+      final shotSize = Size(imgW, imgH);
       frame.image.dispose();
+
+      debugPrint("📸 Image: ${imgW.toInt()}x${imgH.toInt()}, ${(fileSize / 1024).toStringAsFixed(1)} KB, path: ${image.path}");
+
 
       if (!mounted) return;
       setState(() {
@@ -443,11 +338,11 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
         _scanSourceSize = shotSize;
       });
 
-      /// Pass dimensi yang sudah diketahui, skip decode ulang di yolo_service
+      /// Pass dimensi ASLI ke YOLO — jangan pernah di-swap
       await _runDetection(
         image.path,
-        knownWidth: imgWidth,
-        knownHeight: imgHeight,
+        knownWidth: imgW.toInt(),
+        knownHeight: imgH.toInt(),
       );
     } catch (e) {
       debugPrint("ERROR TAKE PICTURE: $e");
@@ -477,14 +372,15 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
       });
 
       try {
-        /// Decode gambar 1x untuk ambil dimensi
+        /// Decode gambar 1x untuk ambil dimensi ASLI
         final bytes = await File(image.path).readAsBytes();
         final codec = await ui.instantiateImageCodec(bytes);
         final frame = await codec.getNextFrame();
-        final imgWidth = frame.image.width;
-        final imgHeight = frame.image.height;
-        final shotSize = Size(imgWidth.toDouble(), imgHeight.toDouble());
+        final imgW = frame.image.width.toDouble();
+        final imgH = frame.image.height.toDouble();
+        final shotSize = Size(imgW, imgH);
         frame.image.dispose();
+
 
         if (!mounted) return;
 
@@ -494,11 +390,11 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
           isCapturing = false;
         });
 
-        /// Pass dimensi yang sudah diketahui
+        /// Pass dimensi ASLI ke YOLO
         await _runDetection(
           image.path,
-          knownWidth: imgWidth,
-          knownHeight: imgHeight,
+          knownWidth: imgW.toInt(),
+          knownHeight: imgH.toInt(),
         );
       } catch (e) {
         debugPrint("ERROR YOLO GALERI: $e");
@@ -529,6 +425,96 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
     });
   }
 
+  Future<void> _generateRecipe() async {
+    if (confirmedIngredients.isEmpty) return;
+
+    // Tampilkan popup loading UI
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        content: Row(
+          children: const [
+            CircularProgressIndicator(color: Color(0xFFF57C00)),
+            SizedBox(width: 20),
+            Expanded(
+              child: Text(
+                "Meracik Resep AI...",
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final response = await http.post(
+        Uri.parse('${ServerConfig.apiBase}/ai/generate-recipe'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({"bahan_bahan": confirmedIngredients}),
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context); // Tutup dialog loading
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final idResep = data['id_resep'];
+        final recipeData = data['data'];
+
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1E1E1E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text(
+              "✨ Resep AI Selesai",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: Text(
+              "Berhasil membuat: ${recipeData['nama_makanan']}\n\nResep ini telah dikarantina (Sandbox) menunggu persetujuan Admin.\nID Resep: $idResep",
+              style: const TextStyle(color: Colors.white70, height: 1.5),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  retake(); // Restart camera setelah selesai
+                },
+                child: const Text(
+                  "Tutup",
+                  style: TextStyle(
+                    color: Color(0xFFF57C00),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Gagal: ${response.body}")));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // Tutup dialog loading
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error koneksi: $e")));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (capturedPath != null) return _buildPreview();
@@ -545,23 +531,16 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (isReady)
-              ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(32),
-                  bottomRight: Radius.circular(32),
-                ),
-                child: SizedBox.expand(
-                  child: FittedBox(
-                    fit: BoxFit.cover,
-                    child: SizedBox(
-                      width: _controller!.value.previewSize!.height,
-                      height: _controller!.value.previewSize!.width,
-                      child: CameraPreview(_controller!),
-                    ),
+              if (isReady)
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(32),
+                    bottomRight: Radius.circular(32),
+                  ),
+                  child: SizedBox.expand(
+                    child: CameraPreview(_controller!),
                   ),
                 ),
-              ),
 
             if (!isReady)
               const Center(
@@ -1194,16 +1173,7 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          onPressed: () {
-                            if (confirmedIngredients.isEmpty) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  "Meneruskan ${confirmedIngredients.length} bahan ke LLM (segera hadir)...",
-                                ),
-                              ),
-                            );
-                          },
+                          onPressed: _generateRecipe,
                         ),
                       ),
                     ],

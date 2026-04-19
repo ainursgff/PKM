@@ -32,18 +32,16 @@ dependencies:
     sdk: flutter
   http: ^1.2.0
   video_player: ^2.8.2
-  camera: 0.10.6
-  flutter_vision: ^1.1.4
+  camera: ^0.11.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   image_picker: ^1.2.1
   image_picker_platform_interface: ^2.11.1
+  google_fonts: ^8.0.2
 
-dependency_overrides:
-  camera_android: 0.10.10+4
-  
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -66,9 +64,9 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  assets:
-    - assets/models/labels.txt
-    - assets/models/yolo.tflite
+  # assets:
+  #   - assets/models/labels.txt
+  #   - assets/models/yolo.tflite
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
