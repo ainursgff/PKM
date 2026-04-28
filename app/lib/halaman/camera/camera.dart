@@ -39,6 +39,7 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin, 
 
   List<Map<String, dynamic>> detections = [];
   List<String> confirmedIngredients = [];
+  bool _isPanelMinimized = false;
 
   double _currentZoom = 1.0;
   double _minZoom = 1.0;
@@ -816,6 +817,27 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin, 
       ),
     );
   }
+  Widget _buildMinimizedPanel() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        FloatingActionButton.extended(
+          heroTag: "btn_ulang",
+          backgroundColor: Colors.black.withValues(alpha: 0.65),
+          icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+          label: const Text("Ulang", style: TextStyle(color: Colors.white)),
+          onPressed: retake,
+        ),
+        FloatingActionButton.extended(
+          heroTag: "btn_expand",
+          backgroundColor: const Color(0xFFF57C00),
+          icon: const Icon(Icons.expand_less_rounded, color: Colors.white, size: 20),
+          label: Text("Lihat Bahan (${confirmedIngredients.length})", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          onPressed: () => setState(() => _isPanelMinimized = false),
+        ),
+      ],
+    );
+  }
 
   Widget _buildPreview() {
     final sourceSize = _scanSourceSize ?? const Size(1, 1);
@@ -938,7 +960,9 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin, 
               bottom: 36,
               left: 16,
               right: 16,
-              child: Column(
+              child: _isPanelMinimized
+                  ? _buildMinimizedPanel()
+                  : Column(
                 children: [
                   if (confirmedIngredients.isNotEmpty)
                     Container(
@@ -985,8 +1009,10 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin, 
                                   ),
                                 ],
                               ),
-                              TextButton.icon(
-                                onPressed: () {
+                              Row(
+                                children: [
+                                  TextButton.icon(
+                                    onPressed: () {
                                   showModalBottomSheet(
                                     context: context,
                                     isScrollControlled: true,
@@ -1010,11 +1036,20 @@ class _CameraPageState extends State<CameraPage> with TickerProviderStateMixin, 
                                   "Edit",
                                   style: TextStyle(color: Color(0xFFF57C00)),
                                 ),
-                                style: TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  minimumSize: const Size(0, 0),
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: const Size(0, 0),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white54, size: 28),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => setState(() => _isPanelMinimized = true),
+                                ),
+                              ],
+                            ),
                             ],
                           ),
                           const SizedBox(height: 14),

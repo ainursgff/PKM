@@ -25,11 +25,11 @@ print(f"\n{'='*50}")
 print("Per-tile analysis (mana tile yang detect ayam/cabai?)")
 print(f"{'='*50}")
 
-TILE_SIZE = 512
-STRIDE = 384
+TILE_SIZE = 640
+STRIDE = 480
 
 # Juga test full image di beberapa resolusi 
-for imgsz in [512, 640, 1024]:
+for imgsz in [640, 1024]:
     dets = run_inference(img, conf=0.15, imgsz=imgsz)
     labels = [f"{d['label']}({d['confidence']:.0%})" for d in dets]
     print(f"\nFull image @ imgsz={imgsz}: {labels}")

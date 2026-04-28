@@ -1,0 +1,216 @@
+/* ============================================
+   SmartCooks Ingredient Editor - Modern Light Theme
+   ============================================ */
+
+.ingredients-sidebar {
+  position: absolute;
+  top: 70px;
+  left: 0;
+  bottom: 0;
+  width: 280px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+  z-index: 20;
+  box-shadow: 16px 0 40px rgba(0, 0, 0, 0.06);
+  border-bottom-left-radius: 28px;
+}
+
+.ingredients-sidebar.open {
+  transform: translateX(0);
+}
+
+.sidebar-header-edit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.header-title-edit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-title-edit h3 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1a1a1a;
+  letter-spacing: -0.2px;
+  margin: 0;
+}
+
+.edit-icon {
+  color: var(--orange-500, #F57C00);
+}
+
+.close-sidebar-btn {
+  background: #f8f9fa;
+  border: 1px solid #eeeeee;
+  color: #666666;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.close-sidebar-btn:hover {
+  background: #f0f0f0;
+  color: #1a1a1a;
+  transform: scale(1.08);
+}
+
+.sidebar-content {
+  padding: 24px 20px;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sidebar-content::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-content::-webkit-scrollbar-thumb {
+  background: #e0e0e0;
+  border-radius: 2px;
+}
+
+.sidebar-desc {
+  font-size: 13.5px;
+  color: #666666;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.add-ingredient-form {
+  display: flex;
+  gap: 10px;
+}
+
+.add-input {
+  flex: 1;
+  background: #f8f9fa;
+  border: 1.5px solid #e0e0e0;
+  color: #1a1a1a;
+  padding: 12px 16px;
+  border-radius: 14px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.01);
+}
+
+.add-input::placeholder {
+  color: #999999;
+}
+
+.add-input:focus {
+  outline: none;
+  border-color: var(--orange-400, #FF9800);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(255, 152, 0, 0.1);
+}
+
+.add-submit-btn {
+  background: linear-gradient(135deg, #FF9800, #F57C00);
+  color: white;
+  border: none;
+  width: 46px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+}
+
+.add-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  background: #cccccc;
+}
+
+.add-submit-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #FB8C00, #EF6C00);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 152, 0, 0.4);
+}
+
+.ingredients-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-content: flex-start;
+}
+
+.empty-ingredients {
+  width: 100%;
+  text-align: center;
+  padding: 32px 16px;
+  color: #888888;
+  font-size: 14px;
+  border: 2px dashed #dcdcdc;
+  border-radius: 16px;
+  background: #fafafa;
+}
+
+.ingredient-chip {
+  background: rgba(255, 152, 0, 0.08);
+  border: 1.5px solid rgba(255, 152, 0, 0.2);
+  padding: 8px 12px 8px 16px;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: slideInChip 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.06);
+}
+
+@keyframes slideInChip {
+  from { opacity: 0; transform: translateY(12px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.chip-label {
+  color: #e65100;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: capitalize;
+  letter-spacing: 0.2px;
+}
+
+.chip-remove-btn {
+  background: rgba(255, 152, 0, 0.12);
+  border: none;
+  color: #e65100;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+
+.chip-remove-btn:hover {
+  background: #EF5350;
+  color: white;
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(239, 83, 80, 0.4);
+}

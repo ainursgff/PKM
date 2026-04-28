@@ -68,7 +68,7 @@ def nms_cross_class(detections, iou_threshold=0.4):
     return keep
 
 
-def run_inference(img, conf=0.25, imgsz=512):
+def run_inference(img, conf=0.25, imgsz=640):
     """Single-pass inference pada satu gambar/tile"""
     results = model(img, verbose=False, conf=conf, iou=0.45, imgsz=imgsz, max_det=30)
     dets = []
@@ -101,21 +101,26 @@ def sahi_detect(img):
     all_detections = []
 
     # ═══════════════════════════════════════════════
-    # PASS 1: Full-image inference di 640
-    # Menangkap objek besar yang terlihat dalam konteks penuh
+    # PASS 1: Full-image inference (Dynamic imgsz)
+    # Mencegah upscaling berlebih pada gambar kecil akibat Mosaic training
     # ═══════════════════════════════════════════════
-    full_dets = run_inference(img, conf=0.25, imgsz=640)
+    longest = max(w, h)
+    optimal_imgsz = 640
+    if longest < 640:
+        optimal_imgsz = max(320, int(round(longest / 32.0) * 32))
+
+    full_dets = run_inference(img, conf=0.25, imgsz=optimal_imgsz)
     all_detections.extend(full_dets)
-    print(f"[SAHI] Pass 1 - Full image (640): {len(full_dets)} dets")
+    print(f"[SAHI] Pass 1 - Full image (imgsz={optimal_imgsz}): {len(full_dets)} dets")
 
     # ═══════════════════════════════════════════════
-    # PASS 2: Tile-based inference di 512 (= training size)
-    # Tile 512x512 dengan stride 384 (overlap ~25%)
+    # PASS 2: Tile-based inference di 640 (= training size)
+    # Tile 640x640 dengan stride 480 (overlap ~25%)
     # Conf lebih ketat (0.30) karena tile partial sering
     # menghasilkan false positive pada background/edges
     # ═══════════════════════════════════════════════
-    TILE_SIZE = 512
-    STRIDE = 384  # overlap = (512-384)/512 = 25%
+    TILE_SIZE = 640
+    STRIDE = 480  # overlap = (640-480)/640 = 25%
     tile_count = 0
 
     for y in range(0, h, STRIDE):

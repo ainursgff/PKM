@@ -9,6 +9,7 @@ import './main.css';
 
 import ServerConfig from '../config';
 import ApiService from '../services/api_service';
+import CameraModal from './kamera/camera';
 
 export default function MainPage() {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ export default function MainPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [hoveredCard, setHoveredCard] = useState(null);
+  const [showCamera, setShowCamera] = useState(false);
 
   useEffect(() => {
     loadMakanan();
@@ -77,7 +79,7 @@ export default function MainPage() {
             <Heart size={20} />
             {sidebarOpen && <span>Favorit</span>}
           </a>
-          <a href="#" className="nav-item">
+          <a href="#" className="nav-item" onClick={(e) => { e.preventDefault(); setShowCamera(true); }}>
             <Camera size={20} />
             {sidebarOpen && <span>Scan Bahan</span>}
           </a>
@@ -175,7 +177,7 @@ export default function MainPage() {
                 <p className="banner-desc">
                   Scan bahan makanan → AI deteksi otomatis → Resep instan
                 </p>
-                <button className="banner-btn">
+                <button className="banner-btn" onClick={() => setShowCamera(true)}>
                   <Camera size={16} />
                   <span>Coba Scan Bahan</span>
                   <ArrowRight size={16} />
@@ -332,6 +334,9 @@ export default function MainPage() {
           </section>
         </div>
       </main>
+
+      {/* Camera Modal Overlay */}
+      {showCamera && <CameraModal onClose={() => setShowCamera(false)} />}
     </div>
   );
 }

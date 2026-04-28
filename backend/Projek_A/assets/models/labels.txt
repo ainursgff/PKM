@@ -1,17 +1,30 @@
-ayam
-bawangM
-bawangP
-cabai
-ikan
-jagung
-jahe
-kentang
-kol
-labu
-minyak
-nasi_p
-sapi
-telur
-terong
-tomat
-wortel
+Ayam
+Bawang Bombai
+Bawang Merah
+Bawang Putih
+Bayam
+Biji Kemiri
+Cabai Hijau
+Cabai Merah
+Daging Sapi
+Daun Bawang
+Ikan
+Jagung
+Jahe
+Kacang Panjang
+Kangkung
+Kencur
+Kentang
+Ketumbar
+Kol
+Kunyit
+Lada
+Lengkuas
+Selada
+Tahu
+Telur
+Tempe
+Terong
+Tomat
+Udang
+Wortel

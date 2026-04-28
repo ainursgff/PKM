@@ -55,8 +55,7 @@ def test_image(image_path, model):
 
     # 5. Test inference di berbagai ukuran
     test_configs = [
-        {"imgsz": 512, "conf": 0.10, "augment": False, "label": "512 (training size)"},
-        {"imgsz": 640, "conf": 0.10, "augment": False, "label": "640 (moderate)"},
+        {"imgsz": 640, "conf": 0.10, "augment": False, "label": "640 (training size)"},
         {"imgsz": 640, "conf": 0.10, "augment": True,  "label": "640+TTA"},
         {"imgsz": 1024, "conf": 0.10, "augment": False, "label": "1024 (large)"},
         {"imgsz": 1024, "conf": 0.10, "augment": True,  "label": "1024+TTA"},

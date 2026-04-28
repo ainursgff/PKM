@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Utensils, Mail, Lock, Loader2 } from 'lucide-react';
+import { ArrowLeft, Utensils, Mail, Lock } from 'lucide-react';
 import ApiService from '../../services/api_service';
 import './login.css';
 
@@ -45,6 +45,29 @@ export default function LoginPage() {
     }
   };
 
+  const createRipple = (event) => {
+    const button = event.currentTarget;
+    if (button.disabled) return;
+    
+    const circle = document.createElement("span");
+    const diameter = Math.max(button.clientWidth, button.clientHeight);
+    const radius = diameter / 2;
+
+    const rect = button.getBoundingClientRect();
+    circle.style.width = circle.style.height = `${diameter}px`;
+    circle.style.left = `${event.clientX - rect.left - radius}px`;
+    circle.style.top = `${event.clientY - rect.top - radius}px`;
+    circle.classList.add("material-ripple-effect");
+
+    const existingRipple = button.getElementsByClassName("material-ripple-effect")[0];
+    if (existingRipple) {
+      existingRipple.remove();
+    }
+
+    button.appendChild(circle);
+    setTimeout(() => circle.remove(), 600);
+  };
+
   return (
     <div className="login-container">
       {/* App Bar (Mirroring Flutter) */}
@@ -53,7 +76,6 @@ export default function LoginPage() {
           <ArrowLeft size={24} />
         </button>
         <h1>Login</h1>
-        <div style={{ width: 48 }}></div> {/* Placeholder to center title */}
       </header>
 
       {/* Flash Message Toast */}
@@ -105,8 +127,19 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <button type="submit" className="login-button ripple" disabled={loading}>
-              {loading ? <Loader2 size={22} className="spinner" /> : 'LOGIN'}
+            <button 
+              type="submit" 
+              className="login-button material-btn" 
+              disabled={loading}
+              onMouseDown={createRipple}
+            >
+              {loading ? (
+                <div className="material-spinner">
+                  <svg className="circular" viewBox="25 25 50 50">
+                    <circle className="path" cx="50" cy="50" r="20" fill="none" strokeWidth="4" strokeMiterlimit="10" />
+                  </svg>
+                </div>
+              ) : 'LOGIN'}
             </button>
           </form>
 

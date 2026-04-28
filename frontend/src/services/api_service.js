@@ -59,6 +59,23 @@ const ApiService = {
 
     return res.json();
   },
+
+  // ================================
+  // DETECT AI (Upload Image)
+  // ================================
+  async detect(imageBlob) {
+    const formData = new FormData();
+    formData.append('image', imageBlob, 'capture.jpg');
+
+    const res = await fetch(`${ServerConfig.apiBase}/detect`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) throw new Error('Gagal memproses deteksi AI');
+
+    return res.json();
+  },
 };
 
 export default ApiService;
